@@ -30,6 +30,21 @@
         button:hover {
             background-color: #45a049;
         }
+
+        .watermark {
+            pointer-events: none;
+            /* 不影响页面操作 */
+            position: fixed;
+            top: -100vh;
+            left: -100vw;
+            width: 300vw;
+            height: 300vh;
+            z-index: 9999;
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" opacity="0.05"><text x="0" y="20" font-size="20">数据仅供参考</text></svg>');
+            display: flex;
+            transform: rotate(-30deg);
+            user-select: none;
+        }
     </style>
 </head>
 
@@ -88,6 +103,7 @@
         setInterval(fetchDataAndUpdateTables, 100);
         fetchDataAndUpdateTables();
     </script>
+    <div class="watermark"></div>
 </body>
 
 </html>
