@@ -106,13 +106,15 @@ async function main() {
                     normal: 0,
                     critical: 0,
                     lucky: 0,
+                    crit_lucky: 0,
                     hpLessen: 0,
+                    total: 0,
                 },
                 total_count: {
                     normal: 0,
                     critical: 0,
                     lucky: 0,
-                    hpLessen: 0,
+                    total: 0,
                 },
             };
             for (const b of dps_window[uid]) {
@@ -127,18 +129,19 @@ async function main() {
                     normal: 0,
                     critical: 0,
                     lucky: 0,
+                    crit_lucky: 0,
                     hpLessen: 0,
+                    total: 0,
                 },
                 total_count: {
                     normal: 0,
                     critical: 0,
                     lucky: 0,
+                    total: 0,
                 },
             };
             user[uid].total_damage = total_damage[uid];
             user[uid].total_count = total_count[uid];
-            user[uid].total_damage.total = user[uid].total_damage.normal + user[uid].total_damage.critical + user[uid].total_damage.lucky;
-            user[uid].total_count.total = user[uid].total_count.normal + user[uid].total_count.critical + user[uid].total_count.lucky;
             user[uid].total_dps = (total_damage[uid].total) / (damage_time[uid][1] - damage_time[uid][0]) * 1000;
         }
         const data = {
@@ -218,20 +221,30 @@ async function main() {
                                         const operator_uid = BigInt(hit[21] || hit[11]) >> 16n;
                                         if (!operator_uid) break;
 
+                                        //初始化
                                         if (!total_damage[operator_uid]) total_damage[operator_uid] = {
                                             normal: 0,
                                             critical: 0,
                                             lucky: 0,
+                                            crit_lucky: 0,
                                             hpLessen: 0,
+                                            total: 0,
                                         };
                                         if (!total_count[operator_uid]) total_count[operator_uid] = {
                                             normal: 0,
                                             critical: 0,
                                             lucky: 0,
+                                            total: 0,
                                         };
+
                                         if (isCrit) {
-                                            total_damage[operator_uid].critical += damage;
                                             total_count[operator_uid].critical++;
+                                            if (luckyValue) {
+                                                total_damage[operator_uid].crit_lucky += damage;
+                                                total_count[operator_uid].lucky++;
+                                            } else {
+                                                total_damage[operator_uid].critical += damage;
+                                            }
                                         } else if (luckyValue) {
                                             total_damage[operator_uid].lucky += damage;
                                             total_count[operator_uid].lucky++;
@@ -239,7 +252,9 @@ async function main() {
                                             total_damage[operator_uid].normal += damage;
                                             total_count[operator_uid].normal++;
                                         }
+                                        total_damage[operator_uid].total += damage;
                                         total_damage[operator_uid].hpLessen += hpLessenValue;
+                                        total_count[operator_uid].total++;
                                         if (!dps_window[operator_uid]) dps_window[operator_uid] = [];
                                         dps_window[operator_uid].push({
                                             time: Date.now(),
@@ -251,10 +266,14 @@ async function main() {
                                         } else {
                                             damage_time[operator_uid][0] = Date.now();
                                         }
+                                        let extra = [];
+                                        if (isCrit) extra.push('Crit');
+                                        if (luckyValue) extra.push('Lucky');
+                                        if (extra.length === 0) extra = ['Normal'];
 
                                         logger.info('User: ' + operator_uid + ' Skill: ' + skill + ' Damage/Healing: ' + damage +
                                                     ' HpLessen: ' + hpLessenValue +
-                                                    ' Extra: ' + (isCrit ? 'Crit' : (luckyValue ? 'Lucky' : (isMiss ? 'Miss' : 'Normal')))
+                                                    ' Extra: ' + extra.join('|')
                                             );
                                     }
                                 } else {
