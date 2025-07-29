@@ -295,7 +295,7 @@ async function main() {
                     }
                     logger.debug('TCP next seq: ' + tcp_next_seq);
                     tcp_cache[ret.info.seqno] = buf;
-                    if (tcp_cache[tcp_next_seq]) {
+                    while (tcp_cache[tcp_next_seq]) {
                         _data = _data.length === 0 ? tcp_cache[tcp_next_seq] : Buffer.concat([_data, tcp_cache[tcp_next_seq]]);
                         tcp_next_seq = (tcp_next_seq + tcp_cache[tcp_next_seq].length) >>> 0; //uint32
                         tcp_cache[tcp_next_seq] = undefined;
