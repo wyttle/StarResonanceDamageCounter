@@ -1,0 +1,21 @@
+{
+  "name": "SRDPSCounter",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.13.1",
+  "dependencies": {
+    "cap": "^0.2.1",
+    "express": "^5.1.0",
+    "protobufjs": "^7.5.3",
+    "socket.io": "^4.8.1",
+    "winston": "^3.17.0",
+    "zstddec": "^0.1.0"
+  }
+}

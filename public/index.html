@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>星痕共鸣实时战斗数据</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            margin: 20px;
+        }
+
+        td,
+        th {
+            border: 1px solid #aaa;
+            padding: 8px;
+        }
+
+        button {
+            margin-left: 20px;
+            padding: 8px 16px;
+            font-size: 16px;
+            border-radius: 8px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🎯 星痕共鸣实时战斗数据展示 V0.2</h1>
+    <h2>⚠ 暂未区分治疗量与伤害量，将合并计算，数据仅供参考</h2>
+
+    <button onclick="clearData()">✨ 清空统计数据</button>
+
+    <table id="damageTable">
+        <thead>
+            <tr>
+                <th>角色 ID</th>
+                <th>总伤害/治疗</th>
+                <th>瞬时DPS</th>
+                <th>总DPS</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        async function fetchDataAndUpdateTables() {
+            try {
+                const res = await fetch('/api/data');
+                const data = await res.json();
+
+
+                const damageTable = document.getElementById('damageTable').querySelector('tbody');
+                damageTable.innerHTML = '';
+                for (const id in data.user) {
+                    const row = `<tr><td>${id}</td><td>${data.user[id].total_damage}</td><td>${data.user[id].realtime_dps}</td><td>${data.user[id].total_dps}</td></tr>`;
+                    damageTable.innerHTML += row;
+                }
+
+            } catch (err) {
+                console.error('获取数据失败：', err);
+            }
+        }
+        async function clearData() {
+            const res = await fetch('/api/clear');
+            const data = await res.json();
+            fetchDataAndUpdateTables();
+        }
+
+        setInterval(fetchDataAndUpdateTables, 100);
+        fetchDataAndUpdateTables();
+    </script>
+</body>
+
+</html>
