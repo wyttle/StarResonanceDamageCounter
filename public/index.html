@@ -18,7 +18,7 @@
             margin-bottom: 10px;
         }
 
-        h2 {
+        h3 {
             color: #e67e22;
             font-weight: normal;
         }
@@ -89,8 +89,8 @@
 </head>
 
 <body>
-    <h1>🎯 星痕共鸣实时战斗数据展示 V1.2</h1>
-    <h2>⚠ 暂未区分治疗量与伤害量，将合并计算，数据仅供参考</h2>
+    <h1>🎯 星痕共鸣实时战斗数据展示 V1.3</h1>
+    <h3>⚠ 暂未区分治疗量与伤害量，将合并计算，数据仅供参考</h3>
     <button onclick="clearData()">✨ 清空统计数据</button>
 
     <div class="card">
@@ -111,6 +111,10 @@
             <tbody></tbody>
         </table>
     </div>
+
+    <div class="watermark"></div>
+
+    <footer style="margin-top: 40px; font-size: 14px; color: #888;">Copyright © 2025 Made with ❤️ by Dimole</footer>
 
     <script>
         async function fetchDataAndUpdateTables() {
@@ -143,8 +147,6 @@
         setInterval(fetchDataAndUpdateTables, 100);
         fetchDataAndUpdateTables();
     </script>
-
-    <div class="watermark"></div>
 </body>
 
 </html>
