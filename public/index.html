@@ -5,35 +5,75 @@
     <meta charset="UTF-8" />
     <title>星痕共鸣实时战斗数据</title>
     <style>
-        table {
-            border-collapse: collapse;
-            margin: 20px;
+        body {
+            font-family: "Segoe UI", sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
         }
 
-        td,
-        th {
-            border: 1px solid #aaa;
-            padding: 8px;
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            color: #e67e22;
+            font-weight: normal;
         }
 
         button {
-            margin-left: 20px;
-            padding: 8px 16px;
+            margin: 20px 0;
+            padding: 10px 20px;
             font-size: 16px;
             border-radius: 8px;
             background-color: #4CAF50;
             color: white;
             border: none;
             cursor: pointer;
+            transition: background-color 0.3s;
         }
 
         button:hover {
             background-color: #45a049;
         }
 
+        .card {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th {
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+
+        td,
+        th {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
         .watermark {
             pointer-events: none;
-            /* 不影响页面操作 */
             position: fixed;
             top: -100vh;
             left: -100vw;
@@ -51,32 +91,32 @@
 <body>
     <h1>🎯 星痕共鸣实时战斗数据展示 V1.2</h1>
     <h2>⚠ 暂未区分治疗量与伤害量，将合并计算，数据仅供参考</h2>
-
     <button onclick="clearData()">✨ 清空统计数据</button>
 
-    <table id="damageTable">
-        <thead>
-            <tr>
-                <th>角色 ID</th>
-                <th>总伤害/治疗</th>
-                <th>暴击伤害/治疗</th>
-                <th>幸运伤害/治疗</th>
-                <th>暴击幸运</th>
-                <th>暴击率</th>
-                <th>幸运率</th>
-                <th>瞬时DPS/HPS</th>
-                <th>总DPS/HPS</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
+    <div class="card">
+        <table id="damageTable">
+            <thead>
+                <tr>
+                    <th>角色 ID</th>
+                    <th>总伤害/治疗</th>
+                    <th>暴击伤害/治疗</th>
+                    <th>幸运伤害/治疗</th>
+                    <th>暴击幸运</th>
+                    <th>暴击率</th>
+                    <th>幸运率</th>
+                    <th>瞬时DPS/HPS</th>
+                    <th>总DPS/HPS</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
 
     <script>
         async function fetchDataAndUpdateTables() {
             try {
                 const res = await fetch('/api/data');
                 const data = await res.json();
-
                 const damageTable = document.getElementById('damageTable').querySelector('tbody');
                 damageTable.innerHTML = '';
                 for (const id in data.user) {
@@ -89,11 +129,11 @@
                                 `<td>${data.user[id].realtime_dps}</td><td>${data.user[id].total_dps}</td></tr>`;
                     damageTable.innerHTML += row;
                 }
-
             } catch (err) {
                 console.error('获取数据失败：', err);
             }
         }
+
         async function clearData() {
             const res = await fetch('/api/clear');
             const data = await res.json();
@@ -103,6 +143,7 @@
         setInterval(fetchDataAndUpdateTables, 100);
         fetchDataAndUpdateTables();
     </script>
+
     <div class="watermark"></div>
 </body>
 
