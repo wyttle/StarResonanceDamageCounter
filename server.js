@@ -50,6 +50,7 @@ class Lock {
 }
 
 let total_damage = {};
+let total_count = {};
 let dps_window = {};
 let damage_time = {};
 
@@ -101,7 +102,18 @@ async function main() {
             if (!user[uid]) user[uid] = {
                 realtime_dps: 0,
                 total_dps: 0,
-                total_damage: 0,
+                total_damage: {
+                    normal: 0,
+                    critical: 0,
+                    lucky: 0,
+                    hpLessen: 0,
+                },
+                total_count: {
+                    normal: 0,
+                    critical: 0,
+                    lucky: 0,
+                    hpLessen: 0,
+                },
             };
             for (const b of dps_window[uid]) {
                 user[uid].realtime_dps += b.damage;
@@ -111,10 +123,23 @@ async function main() {
             if (!user[uid]) user[uid] = {
                 realtime_dps: 0,
                 total_dps: 0,
-                total_damage: 0,
+                total_damage: {
+                    normal: 0,
+                    critical: 0,
+                    lucky: 0,
+                    hpLessen: 0,
+                },
+                total_count: {
+                    normal: 0,
+                    critical: 0,
+                    lucky: 0,
+                },
             };
             user[uid].total_damage = total_damage[uid];
-            user[uid].total_dps = total_damage[uid] / (damage_time[uid][1] - damage_time[uid][0]) * 1000;
+            user[uid].total_count = total_count[uid];
+            user[uid].total_damage.total = user[uid].total_damage.normal + user[uid].total_damage.critical + user[uid].total_damage.lucky;
+            user[uid].total_count.total = user[uid].total_count.normal + user[uid].total_count.critical + user[uid].total_count.lucky;
+            user[uid].total_dps = (total_damage[uid].total) / (damage_time[uid][1] - damage_time[uid][0]) * 1000;
         }
         const data = {
             code: 0,
@@ -124,6 +149,7 @@ async function main() {
     });
     app.get('/api/clear', (req, res) => {
         total_damage = {};
+        total_count = {};
         dps_window = {};
         damage_time = {};
         logger.info('Statistics have been cleared!');
@@ -180,18 +206,40 @@ async function main() {
                             if (!Array.isArray(body1)) body1 = [body1];
                             for (const b of body1) {
                                 if (b[7] && b[7][2]) {
+                                    logger.debug(b.toBase64());
                                     const hits = Array.isArray(b[7][2]) ? b[7][2] : [b[7][2]];
                                     for (const hit of hits) {
                                         const skill = hit[12];
                                         if (typeof skill !== 'number') break; //可以用来区分伤害和治疗啥的，但我不想去导出它的表
-                                        const damage = hit[6] ?? hit[8]; //value ?? luckyValue
+                                        const value = hit[6], luckyValue = hit[8], isMiss = hit[2], isCrit = hit[5], hpLessenValue = hit[9] ?? 0;
+                                        const damage = value ?? luckyValue;
                                         const is_player = (BigInt(hit[21] || hit[11]) & 0xffffn) === 640n;
                                         if (!is_player) break; //排除怪物攻击
                                         const operator_uid = BigInt(hit[21] || hit[11]) >> 16n;
                                         if (!operator_uid) break;
 
-                                        if (!total_damage[operator_uid]) total_damage[operator_uid] = 0;
-                                        total_damage[operator_uid] += damage;
+                                        if (!total_damage[operator_uid]) total_damage[operator_uid] = {
+                                            normal: 0,
+                                            critical: 0,
+                                            lucky: 0,
+                                            hpLessen: 0,
+                                        };
+                                        if (!total_count[operator_uid]) total_count[operator_uid] = {
+                                            normal: 0,
+                                            critical: 0,
+                                            lucky: 0,
+                                        };
+                                        if (isCrit) {
+                                            total_damage[operator_uid].critical += damage;
+                                            total_count[operator_uid].critical++;
+                                        } else if (luckyValue) {
+                                            total_damage[operator_uid].lucky += damage;
+                                            total_count[operator_uid].lucky++;
+                                        } else {
+                                            total_damage[operator_uid].normal += damage;
+                                            total_count[operator_uid].normal++;
+                                        }
+                                        total_damage[operator_uid].hpLessen += hpLessenValue;
                                         if (!dps_window[operator_uid]) dps_window[operator_uid] = [];
                                         dps_window[operator_uid].push({
                                             time: Date.now(),
@@ -204,7 +252,10 @@ async function main() {
                                             damage_time[operator_uid][0] = Date.now();
                                         }
 
-                                        logger.info('User: ' + operator_uid + '\tSkill: ' + skill + '\tDamage/Healing: ' + damage);
+                                        logger.info('User: ' + operator_uid + ' Skill: ' + skill + ' Damage/Healing: ' + damage +
+                                                    ' HpLessen: ' + hpLessenValue +
+                                                    ' Extra: ' + (isCrit ? 'Crit' : (luckyValue ? 'Lucky' : (isMiss ? 'Miss' : 'Normal')))
+                                            );
                                     }
                                 } else {
                                     //logger.debug(data1.toString('hex'));
@@ -293,7 +344,7 @@ async function main() {
                     if (tcp_next_seq === -1 && buf.length > 4 && buf.readUInt32BE() < 999999) { //第一次抓包可能抓到后半段的，先丢了
                         tcp_next_seq = ret.info.seqno;
                     }
-                    logger.debug('TCP next seq: ' + tcp_next_seq);
+                    //logger.debug('TCP next seq: ' + tcp_next_seq);
                     tcp_cache[ret.info.seqno] = buf;
                     while (tcp_cache[tcp_next_seq]) {
                         _data = _data.length === 0 ? tcp_cache[tcp_next_seq] : Buffer.concat([_data, tcp_cache[tcp_next_seq]]);

@@ -34,7 +34,7 @@
 </head>
 
 <body>
-    <h1>🎯 星痕共鸣实时战斗数据展示 V0.2</h1>
+    <h1>🎯 星痕共鸣实时战斗数据展示 V1.1</h1>
     <h2>⚠ 暂未区分治疗量与伤害量，将合并计算，数据仅供参考</h2>
 
     <button onclick="clearData()">✨ 清空统计数据</button>
@@ -44,8 +44,12 @@
             <tr>
                 <th>角色 ID</th>
                 <th>总伤害/治疗</th>
-                <th>瞬时DPS</th>
-                <th>总DPS</th>
+                <th>暴击伤害/治疗</th>
+                <th>幸运伤害/治疗</th>
+                <th>暴击率</th>
+                <th>幸运率</th>
+                <th>瞬时DPS/HPS</th>
+                <th>总DPS/HPS</th>
             </tr>
         </thead>
         <tbody></tbody>
@@ -57,11 +61,15 @@
                 const res = await fetch('/api/data');
                 const data = await res.json();
 
-
                 const damageTable = document.getElementById('damageTable').querySelector('tbody');
                 damageTable.innerHTML = '';
                 for (const id in data.user) {
-                    const row = `<tr><td>${id}</td><td>${data.user[id].total_damage}</td><td>${data.user[id].realtime_dps}</td><td>${data.user[id].total_dps}</td></tr>`;
+                    const crit_rate = data.user[id].total_count.critical / data.user[id].total_count.total;
+                    const lucky_rate = data.user[id].total_count.lucky / data.user[id].total_count.total;
+                    const row = `<tr><td>${id}</td><td>${data.user[id].total_damage.total}</td>` +
+                                `<td>${data.user[id].total_damage.critical}</td><td>${data.user[id].total_damage.lucky}</td>` +
+                                `<td>${(crit_rate * 100).toFixed(2)}%</td><td>${(lucky_rate * 100).toFixed(2)}%</td>` +
+                                `<td>${data.user[id].realtime_dps}</td><td>${data.user[id].total_dps}</td></tr>`;
                     damageTable.innerHTML += row;
                 }
 
