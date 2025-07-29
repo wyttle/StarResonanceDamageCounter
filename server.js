@@ -142,7 +142,7 @@ async function main() {
             };
             user[uid].total_damage = total_damage[uid];
             user[uid].total_count = total_count[uid];
-            user[uid].total_dps = (total_damage[uid].total) / (damage_time[uid][1] - damage_time[uid][0]) * 1000;
+            user[uid].total_dps = ((total_damage[uid].total) / (damage_time[uid][1] - damage_time[uid][0]) * 1000).toFixed(2);
         }
         const data = {
             code: 0,
