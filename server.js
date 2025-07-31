@@ -56,6 +56,7 @@ let damage_time = {};
 
 async function main() {
     print('Welcome to use Damage Counter for Star Resonance by Dimole!');
+    print('Version: V1.5');
     for (let i = 0; i < devices.length; i++) {
         print(i + '.\t' + devices[i].description);
     }
@@ -166,7 +167,7 @@ async function main() {
     });
 
     logger.info('Welcome!');
-    logger.info('Attempting to find the game server, please wait!');
+    logger.info('Attempting to find the game server, please move your character and wait!');
 
     let user_uid;
     let current_server = '';
@@ -200,7 +201,7 @@ async function main() {
                                 const uid = BigInt(body[5]) >> 16n;
                                 if (user_uid !== uid) {
                                     user_uid = uid;
-                                    logger.info('Got new player UID! New UID: ' + user_uid);
+                                    logger.info('Got player UID! UID: ' + user_uid);
                                 }
                             }
                         }
@@ -343,18 +344,18 @@ async function main() {
                                         if (Buffer.compare(data1.subarray(5, 5 + signature.length), signature)) break;
                                         try {
                                             let body = pb.decode(data1.subarray(18)) || {};
+                                            if (current_server !== src_server) {
+                                                current_server = src_server;
+                                                _data = Buffer.alloc(0);
+                                                tcp_next_seq = -1;
+                                                tcp_last_time = 0;
+                                                tcp_cache = {};
+                                                tcp_cache_size = 0;
+                                                logger.info('Got Scene Server Address: ' + srcaddr + ':' + srcport);
+                                            }
                                             if (data1[17] === 0x2e) {
                                                 body = body[1];
                                                 if (body[5]) { //玩家uid
-                                                    if (current_server !== src_server) {
-                                                        current_server = src_server;
-                                                        _data = Buffer.alloc(0);
-                                                        tcp_next_seq = -1;
-                                                        tcp_last_time = 0;
-                                                        tcp_cache = {};
-                                                        tcp_cache_size = 0;
-                                                        logger.info('Got Scene Server Address: ' + srcaddr + ':' + srcport);
-                                                    }
                                                     if (!user_uid) {
                                                         user_uid = BigInt(body[5]) >> 16n;
                                                         logger.info('Got player UID! UID: ' + user_uid);
