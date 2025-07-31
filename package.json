@@ -1,6 +1,6 @@
 {
   "name": "SRDPSCounter",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Damage Counter for Star Resonance",
   "main": "server.js",
   "scripts": {
