@@ -350,6 +350,7 @@ async function main() {
                                                     if (current_server !== src_server) {
                                                         current_server = src_server;
                                                         tcp_next_seq = -1;
+                                                        tcp_last_time = 0;
                                                         tcp_cache = {};
                                                         logger.info('Got Scene Server Address: ' + srcaddr + ':' + srcport);
                                                     }
