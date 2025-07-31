@@ -376,6 +376,7 @@ async function main() {
                     if (tcp_cache_size > 20) {
                         logger.warn('Cannot capture the next packet! Is the game restarted or reconnected? seq: ' + tcp_next_seq);
                         current_server = '';
+                        tcp_cache_size = 0;
                     }
                     while (_data.length > 4) {
                         let len = _data.readUInt32BE();
