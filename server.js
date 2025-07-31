@@ -394,8 +394,8 @@ async function main() {
                             }
                         }, 15000);
                     }
-                    if (tcp_cache_size > 15) {
-                        logger.warn('Too much unused tcp cache! Is the game reconnected? seq: ' + tcp_next_seq);
+                    if (tcp_cache_size > 20) {
+                        logger.warn('Too much unused tcp cache! Is the game reconnected? seq: ' + tcp_next_seq + ' size:' + tcp_cache_size);
                         clearTcpCache();
                     }
                     while (_data.length > 4) {
