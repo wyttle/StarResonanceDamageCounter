@@ -191,8 +191,6 @@ async function main() {
                     const len_buf = stream.read(4);
                     if (!len_buf) break;
                     data1 = stream.read(len_buf.readUInt32BE() - 4);
-                    const signature = Buffer.from([0x00, 0x63, 0x33, 0x53, 0x42, 0x00]); //c3SB??
-                    if (Buffer.compare(data1.subarray(5, 5 + signature.length), signature)) break;
                     try {
                         let body = pb.decode(data1.subarray(18)) || {};
                         if (data1[17] === 0x2e) {
