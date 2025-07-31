@@ -294,6 +294,13 @@ async function main() {
             logger.debug(e);
         }
     }
+    const clearTcpCache = () => {
+        _data = Buffer.alloc(0);
+        tcp_next_seq = -1;
+        tcp_last_time = 0;
+        tcp_cache = {};
+        tcp_cache_size = 0;
+    }
 
     //抓包相关
     const c = new Cap();
@@ -325,7 +332,7 @@ async function main() {
                     if (tcp_last_time && Date.now() - tcp_last_time > 30000) {
                         logger.warn('Cannot capture the next packet! Is the game closed or disconnected? seq: ' + tcp_next_seq);
                         current_server = '';
-                        tcp_last_time = 0;
+                        clearTcpCache();
                     }
 
                     if (current_server !== src_server) {
@@ -346,11 +353,7 @@ async function main() {
                                             let body = pb.decode(data1.subarray(18)) || {};
                                             if (current_server !== src_server) {
                                                 current_server = src_server;
-                                                _data = Buffer.alloc(0);
-                                                tcp_next_seq = -1;
-                                                tcp_last_time = 0;
-                                                tcp_cache = {};
-                                                tcp_cache_size = 0;
+                                                clearTcpCache();
                                                 logger.info('Got Scene Server Address: ' + srcaddr + ':' + srcport);
                                             }
                                             if (data1[17] === 0x2e) {
@@ -386,11 +389,7 @@ async function main() {
                     }
                     if (tcp_cache_size > 10) {
                         logger.warn('Too much unused tcp cache! Is the game reconnected? seq: ' + tcp_next_seq);
-                        _data = Buffer.alloc(0);
-                        tcp_next_seq = -1;
-                        tcp_last_time = 0;
-                        tcp_cache = {};
-                        tcp_cache_size = 0;
+                        clearTcpCache();
                     }
                     while (_data.length > 4) {
                         let len = _data.readUInt32BE();
