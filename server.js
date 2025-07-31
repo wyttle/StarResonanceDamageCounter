@@ -349,6 +349,7 @@ async function main() {
                                                 if (body[5]) { //玩家uid
                                                     if (current_server !== src_server) {
                                                         current_server = src_server;
+                                                        _data = Buffer.alloc(0);
                                                         tcp_next_seq = -1;
                                                         tcp_last_time = 0;
                                                         tcp_cache = {};
@@ -371,6 +372,7 @@ async function main() {
                     await tcp_lock.acquire();
                     if (tcp_next_seq === -1 && buf.length > 4 && buf.readUInt32BE() < 999999) { //第一次抓包可能抓到后半段的，先丢了
                         tcp_next_seq = ret.info.seqno;
+                        logger.info('Successfully matched the game protocol, now the program can get the damage!');
                     }
                     //logger.debug('TCP next seq: ' + tcp_next_seq);
                     tcp_cache[ret.info.seqno] = buf;
