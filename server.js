@@ -386,8 +386,15 @@ async function main() {
                         tcp_cache[tcp_next_seq] = undefined;
                         tcp_cache_size--;
                         tcp_last_time = Date.now();
+                        const seq = tcp_next_seq;
+                        setTimeout(() => {
+                            if (tcp_cache[seq]) {
+                                tcp_cache[seq] = undefined;
+                                tcp_cache_size--;
+                            }
+                        }, 15000);
                     }
-                    if (tcp_cache_size > 10) {
+                    if (tcp_cache_size > 30) {
                         logger.warn('Too much unused tcp cache! Is the game reconnected? seq: ' + tcp_next_seq);
                         clearTcpCache();
                     }
