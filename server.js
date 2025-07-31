@@ -396,10 +396,12 @@ async function main() {
                             }
                         }, 10000);
                     }
+                    /*
                     if (tcp_cache_size > 30) {
                         logger.warn('Too much unused tcp cache! Is the game reconnected? seq: ' + tcp_next_seq + ' size:' + tcp_cache_size);
                         clearTcpCache();
                     }
+                    */
                     while (_data.length > 4) {
                         let len = _data.readUInt32BE();
                         if (_data.length >= len) {
