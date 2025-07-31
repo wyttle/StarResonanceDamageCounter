@@ -318,6 +318,7 @@ async function main() {
                 ret = decoders.IPV4(buffer1, ret.offset);
                 //logger.debug('from: ' + ret.info.srcaddr + ' to ' + ret.info.dstaddr);
                 const srcaddr = ret.info.srcaddr;
+                const dstaddr = ret.info.dstaddr;
 
                 if (ret.info.protocol === PROTOCOL.IP.TCP) {
                     var datalen = ret.info.totallen - ret.hdrlen;
@@ -325,7 +326,8 @@ async function main() {
                     ret = decoders.TCP(buffer1, ret.offset);
                     //logger.debug(' from port: ' + ret.info.srcport + ' to port: ' + ret.info.dstport);
                     const srcport = ret.info.srcport;
-                    const src_server = srcaddr + ':' + srcport;
+                    const dstport = ret.info.dstport;
+                    const src_server = srcaddr + ':' + srcport + ' -> ' + dstaddr + ':' + dstport;
                     datalen -= ret.hdrlen;
                     let buf = Buffer.from(buffer1.subarray(ret.offset, ret.offset + datalen));
 
@@ -354,7 +356,7 @@ async function main() {
                                             if (current_server !== src_server) {
                                                 current_server = src_server;
                                                 clearTcpCache();
-                                                logger.info('Got Scene Server Address: ' + srcaddr + ':' + srcport);
+                                                logger.info('Got Scene Server Address: ' + src_server);
                                             }
                                             if (data1[17] === 0x2e) {
                                                 body = body[1];
