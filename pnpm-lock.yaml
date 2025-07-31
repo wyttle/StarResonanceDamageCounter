@@ -23,9 +23,6 @@ importers:
       winston:
         specifier: ^3.17.0
         version: 3.17.0
-      zstddec:
-        specifier: ^0.1.0
-        version: 0.1.0
 
 packages:
 
@@ -506,9 +503,6 @@ packages:
         optional: true
       utf-8-validate:
         optional: true
-
-  zstddec@0.1.0:
-    resolution: {integrity: sha512-w2NTI8+3l3eeltKAdK8QpiLo/flRAr2p8AGeakfMZOXBxOg9HIu4LVDxBi81sYgVhFhdJjv1OrB5ssI8uFPoLg==}
 
 snapshots:
 
@@ -1046,5 +1040,3 @@ snapshots:
   wrappy@1.0.2: {}
 
   ws@8.17.1: {}
-
-  zstddec@0.1.0: {}
