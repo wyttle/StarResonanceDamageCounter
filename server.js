@@ -173,7 +173,7 @@ async function main() {
     let _data = Buffer.alloc(0);
     let tcp_next_seq = -1;
     let tcp_cache = {};
-    let tcp_cache_size = 0;
+    let tcp_last_time = 0;
     const tcp_lock = new Lock();
 
     const processPacket = (buf) => {
@@ -321,6 +321,13 @@ async function main() {
                     const src_server = srcaddr + ':' + srcport;
                     datalen -= ret.hdrlen;
                     let buf = Buffer.from(buffer1.subarray(ret.offset, ret.offset + datalen));
+
+                    if (tcp_last_time && Date.now() - tcp_last_time > 60000) {
+                        logger.warn('Cannot capture the next packet! Is the game closed or disconnected? seq: ' + tcp_next_seq);
+                        current_server = '';
+                        tcp_last_time = 0;
+                    }
+
                     if (current_server !== src_server) {
                         try {
                             //尝试通过小包识别服务器
@@ -366,17 +373,11 @@ async function main() {
                     }
                     //logger.debug('TCP next seq: ' + tcp_next_seq);
                     tcp_cache[ret.info.seqno] = buf;
-                    tcp_cache_size++;
                     while (tcp_cache[tcp_next_seq]) {
                         _data = _data.length === 0 ? tcp_cache[tcp_next_seq] : Buffer.concat([_data, tcp_cache[tcp_next_seq]]);
                         tcp_next_seq = (tcp_next_seq + tcp_cache[tcp_next_seq].length) >>> 0; //uint32
                         tcp_cache[tcp_next_seq] = undefined;
-                        tcp_cache_size--;
-                    }
-                    if (tcp_cache_size > 20) {
-                        logger.warn('Cannot capture the next packet! Is the game restarted or reconnected? seq: ' + tcp_next_seq);
-                        current_server = '';
-                        tcp_cache_size = 0;
+                        tcp_last_time = Date.now();
                     }
                     while (_data.length > 4) {
                         let len = _data.readUInt32BE();
