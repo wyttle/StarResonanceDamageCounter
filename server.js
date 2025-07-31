@@ -167,7 +167,7 @@ async function main() {
     });
 
     logger.info('Welcome!');
-    logger.info('Attempting to find the game server, please move your character and wait!');
+    logger.info('Attempting to find the game server, please wait!');
 
     let user_uid;
     let current_server = '';
