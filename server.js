@@ -56,7 +56,7 @@ let damage_time = {};
 
 async function main() {
     print('Welcome to use Damage Counter for Star Resonance by Dimole!');
-    print('Version: V1.5');
+    print('Version: V1.6');
     for (let i = 0; i < devices.length; i++) {
         print(i + '.\t' + devices[i].description);
     }
