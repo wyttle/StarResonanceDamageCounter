@@ -173,6 +173,7 @@ async function main() {
     let _data = Buffer.alloc(0);
     let tcp_next_seq = -1;
     let tcp_cache = {};
+    let tcp_cache_size = 0;
     let tcp_last_time = 0;
     const tcp_lock = new Lock();
 
@@ -351,6 +352,7 @@ async function main() {
                                                         tcp_next_seq = -1;
                                                         tcp_last_time = 0;
                                                         tcp_cache = {};
+                                                        tcp_cache_size = 0;
                                                         logger.info('Got Scene Server Address: ' + srcaddr + ':' + srcport);
                                                     }
                                                     if (!user_uid) {
@@ -373,11 +375,21 @@ async function main() {
                     }
                     //logger.debug('TCP next seq: ' + tcp_next_seq);
                     tcp_cache[ret.info.seqno] = buf;
+                    tcp_cache_size++;
                     while (tcp_cache[tcp_next_seq]) {
                         _data = _data.length === 0 ? tcp_cache[tcp_next_seq] : Buffer.concat([_data, tcp_cache[tcp_next_seq]]);
                         tcp_next_seq = (tcp_next_seq + tcp_cache[tcp_next_seq].length) >>> 0; //uint32
                         tcp_cache[tcp_next_seq] = undefined;
+                        tcp_cache_size--;
                         tcp_last_time = Date.now();
+                    }
+                    if (tcp_cache_size > 20) {
+                        logger.warn('Too much unused tcp cache! Is the game disconnected? seq: ' + tcp_next_seq);
+                        _data = Buffer.alloc(0);
+                        tcp_next_seq = -1;
+                        tcp_last_time = 0;
+                        tcp_cache = {};
+                        tcp_cache_size = 0;
                     }
                     while (_data.length > 4) {
                         let len = _data.readUInt32BE();
