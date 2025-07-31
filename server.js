@@ -322,7 +322,7 @@ async function main() {
                     datalen -= ret.hdrlen;
                     let buf = Buffer.from(buffer1.subarray(ret.offset, ret.offset + datalen));
 
-                    if (tcp_last_time && Date.now() - tcp_last_time > 60000) {
+                    if (tcp_last_time && Date.now() - tcp_last_time > 30000) {
                         logger.warn('Cannot capture the next packet! Is the game closed or disconnected? seq: ' + tcp_next_seq);
                         current_server = '';
                         tcp_last_time = 0;
