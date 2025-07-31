@@ -383,7 +383,7 @@ async function main() {
                         tcp_cache_size--;
                         tcp_last_time = Date.now();
                     }
-                    if (tcp_cache_size > 20) {
+                    if (tcp_cache_size > 10) {
                         logger.warn('Too much unused tcp cache! Is the game reconnected? seq: ' + tcp_next_seq);
                         _data = Buffer.alloc(0);
                         tcp_next_seq = -1;
