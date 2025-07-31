@@ -377,7 +377,7 @@ async function main() {
                     if (tcp_next_seq === -1 && buf.length > 4 && buf.readUInt32BE() < 999999) { //第一次抓包可能抓到后半段的，先丢了
                         tcp_next_seq = ret.info.seqno;
                     }
-                    //logger.debug('TCP next seq: ' + tcp_next_seq);
+                    logger.debug('TCP next seq: ' + tcp_next_seq);
                     tcp_cache[ret.info.seqno] = buf;
                     tcp_cache_size++;
                     while (tcp_cache[tcp_next_seq]) {
