@@ -56,7 +56,7 @@ let damage_time = {};
 
 async function main() {
     print('Welcome to use Damage Counter for Star Resonance by Dimole!');
-    print('Version: V1.6');
+    print('Version: V1.7');
     for (let i = 0; i < devices.length; i++) {
         print(i + '.\t' + devices[i].description);
     }
@@ -382,17 +382,11 @@ async function main() {
                     tcp_cache_size++;
                     while (tcp_cache[tcp_next_seq]) {
                         const seq = tcp_next_seq;
-                        _data = _data.length === 0 ? tcp_cache[tcp_next_seq] : Buffer.concat([_data, tcp_cache[tcp_next_seq]]);
-                        tcp_next_seq = (tcp_next_seq + tcp_cache[tcp_next_seq].length) >>> 0; //uint32
+                        _data = _data.length === 0 ? tcp_cache[seq] : Buffer.concat([_data, tcp_cache[seq]]);
+                        tcp_next_seq = (seq + tcp_cache[seq].length) >>> 0; //uint32
                         tcp_cache[seq] = undefined;
                         tcp_cache_size--;
                         tcp_last_time = Date.now();
-                        setTimeout(() => {
-                            if (tcp_cache[seq]) {
-                                tcp_cache[seq] = undefined;
-                                tcp_cache_size--;
-                            }
-                        }, 5000);
                         setTimeout(() => {
                             if (tcp_cache[seq]) {
                                 tcp_cache[seq] = undefined;
