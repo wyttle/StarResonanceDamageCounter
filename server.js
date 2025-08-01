@@ -53,6 +53,7 @@ let total_damage = {};
 let total_count = {};
 let dps_window = {};
 let damage_time = {};
+let realtime_dps = {};
 
 async function main() {
     print('Welcome to use Damage Counter for Star Resonance by Dimole!');
@@ -92,6 +93,19 @@ async function main() {
             while (dps_window[uid].length > 0 && now - dps_window[uid][0].time > 1000) {
                 dps_window[uid].shift();
             }
+            if (!realtime_dps[uid]) {
+                realtime_dps[uid] = {
+                    value: 0,
+                    max: 0,
+                }
+            }
+            realtime_dps[uid].value = 0;
+            for (const b of dps_window[uid]) {
+                realtime_dps[uid].value += b.damage;
+            }
+            if (realtime_dps[uid].value > realtime_dps[uid].max) {
+                realtime_dps[uid].max = realtime_dps[uid].value;
+            }
         }
     }, 100);
 
@@ -99,32 +113,10 @@ async function main() {
     app.use(express.static('public'));
     app.get('/api/data', (req, res) => {
         const user = {};
-        for (const uid of Object.keys(dps_window)) {
-            if (!user[uid]) user[uid] = {
-                realtime_dps: 0,
-                total_dps: 0,
-                total_damage: {
-                    normal: 0,
-                    critical: 0,
-                    lucky: 0,
-                    crit_lucky: 0,
-                    hpLessen: 0,
-                    total: 0,
-                },
-                total_count: {
-                    normal: 0,
-                    critical: 0,
-                    lucky: 0,
-                    total: 0,
-                },
-            };
-            for (const b of dps_window[uid]) {
-                user[uid].realtime_dps += b.damage;
-            }
-        }
         for (const uid of Object.keys(total_damage)) {
             if (!user[uid]) user[uid] = {
                 realtime_dps: 0,
+                realtime_dps_max: 0,
                 total_dps: 0,
                 total_damage: {
                     normal: 0,
@@ -144,6 +136,8 @@ async function main() {
             user[uid].total_damage = total_damage[uid];
             user[uid].total_count = total_count[uid];
             user[uid].total_dps = ((total_damage[uid].total) / (damage_time[uid][1] - damage_time[uid][0]) * 1000).toFixed(2);
+            user[uid].realtime_dps = realtime_dps[uid] ? realtime_dps[uid].value : 0;
+            user[uid].realtime_dps_max = realtime_dps[uid] ? realtime_dps[uid].max : 0;
         }
         const data = {
             code: 0,
@@ -156,6 +150,7 @@ async function main() {
         total_count = {};
         dps_window = {};
         damage_time = {};
+        realtime_dps = {};
         logger.info('Statistics have been cleared!');
         res.json({
             code: 0,

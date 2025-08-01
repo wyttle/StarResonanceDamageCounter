@@ -142,7 +142,8 @@
                                 `<td>${data.user[id].total_damage.critical}</td><td>${data.user[id].total_damage.lucky}</td>` +
                                 `<td>${data.user[id].total_damage.crit_lucky}</td>` +
                                 `<td>${(crit_rate * 100).toFixed(2)}%</td><td>${(lucky_rate * 100).toFixed(2)}%</td>` +
-                                `<td>${data.user[id].realtime_dps}</td><td>${data.user[id].total_dps}</td></tr>`;
+                                `<td>${data.user[id].realtime_dps} (${data.user[id].realtime_dps_max}Max)</td>` +
+                                `<td>${data.user[id].total_dps}</td></tr>`;
                     damageTable.innerHTML += row;
                 }
             } catch (err) {
