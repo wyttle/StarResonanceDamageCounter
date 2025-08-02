@@ -246,7 +246,7 @@
                                 `<td>${user.total_damage.crit_lucky}</td>` +
                                 `<td>${(crit_rate * 100).toFixed(2)}%</td><td>${(lucky_rate * 100).toFixed(2)}%</td>` +
                                 `<td>${user.realtime_dps}</td><td>${user.realtime_dps_max}</td>` +
-                                `<td>${user.total_dps}</td></tr>`;
+                                `<td>${user.total_dps.toFixed(2)}</td></tr>`;
                     damageTable.innerHTML += row;
                 }
             } catch (err) {

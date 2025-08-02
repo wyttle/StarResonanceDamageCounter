@@ -135,7 +135,7 @@ async function main() {
             };
             user[uid].total_damage = total_damage[uid];
             user[uid].total_count = total_count[uid];
-            user[uid].total_dps = Number(((total_damage[uid].total) / (damage_time[uid][1] - damage_time[uid][0]) * 1000).toFixed(2)) || 0;
+            user[uid].total_dps = ((total_damage[uid].total) / (damage_time[uid][1] - damage_time[uid][0]) * 1000) || 0;
             user[uid].realtime_dps = realtime_dps[uid] ? realtime_dps[uid].value : 0;
             user[uid].realtime_dps_max = realtime_dps[uid] ? realtime_dps[uid].max : 0;
         }
