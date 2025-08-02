@@ -11,16 +11,19 @@
             margin: 0;
             padding: 20px;
             text-align: center;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
         h1 {
             color: #2c3e50;
             margin-bottom: 10px;
+            transition: color 0.3s ease;
         }
 
         h3 {
             color: #e67e22;
             font-weight: normal;
+            transition: color 0.3s ease;
         }
 
         button {
@@ -51,6 +54,7 @@
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
             padding: 20px;
             overflow-x: auto;
+            transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
         }
 
         table {
@@ -63,6 +67,7 @@
             background-color: #3498db;
             color: white;
             font-weight: bold;
+            transition: background-color 0.3s ease;
         }
 
         td,
@@ -70,10 +75,12 @@
             border: 1px solid #ddd;
             padding: 10px;
             text-align: center;
+            transition: border-color 0.3s ease, background-color 0.3s ease;
         }
 
         tr:nth-child(even) {
             background-color: #f2f2f2;
+            transition: background-color 0.3s ease;
         }
 
         .watermark {
@@ -88,6 +95,7 @@
             display: flex;
             transform: rotate(-30deg);
             user-select: none;
+            transition: background-image 0.3s ease;
         }
 
         .background {
@@ -101,6 +109,63 @@
             z-index: -1;
             background-repeat: no-repeat;
         }
+
+        /* 夜间模式样式 */
+        .dark-mode {
+            background-color: #1a1a1a !important;
+            color: #e0e0e0 !important;
+        }
+
+        .dark-mode h1 {
+            color: #4fc3f7 !important;
+        }
+
+        .dark-mode h3 {
+            color: #ff9800 !important;
+        }
+
+        .dark-mode .card {
+            background: #2d2d2d !important;
+            color: #e0e0e0 !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
+        }
+
+        .dark-mode th {
+            background-color: #1976d2 !important;
+        }
+
+        .dark-mode tr:nth-child(even) {
+            background-color: #383838 !important;
+        }
+
+        .dark-mode button {
+            background-color: #424242 !important;
+            color: #e0e0e0 !important;
+        }
+
+        .dark-mode button:hover {
+            background-color: #616161 !important;
+        }
+
+        .dark-mode td {
+            border-color: #555 !important;
+        }
+
+        .dark-mode th {
+            border-color: #555 !important;
+        }
+
+        .dark-mode footer {
+            color: #aaa !important;
+        }
+
+        .dark-mode footer a {
+            color: #4fc3f7 !important;
+        }
+
+        .dark-mode .watermark {
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" opacity="0.08"><text x="0" y="20" font-size="20" fill="white">数据仅供参考</text></svg>') !important;
+        }
     </style>
 </head>
 
@@ -108,6 +173,7 @@
     <h1>🎯 星痕共鸣实时战斗数据展示 V1.9</h1>
     <h3>⚠ 暂未区分治疗量与伤害量，将合并计算，数据仅供参考</h3>
     <button onclick="clearData()">✨ 清空统计数据</button>
+    <button onclick="toggleDarkMode()">🌙 夜间模式</button>
 
     <div class="card">
         <table id="damageTable">
@@ -115,8 +181,8 @@
                 <tr>
                     <th>角色 ID</th>
                     <th>总伤害/治疗</th>
-                    <th>暴击伤害/治疗</th>
-                    <th>幸运伤害/治疗</th>
+                    <th>纯暴击</th>
+                    <th>纯幸运</th>
                     <th>暴击幸运</th>
                     <th>暴击率</th>
                     <th>幸运率</th>
@@ -162,8 +228,37 @@
             fetchDataAndUpdateTables();
         }
 
+        function toggleDarkMode() {
+            const body = document.body;
+            const isDarkMode = body.classList.contains('dark-mode');
+            const button = event.target;
+            
+            if (isDarkMode) {
+                body.classList.remove('dark-mode');
+                button.textContent = '🌙 夜间模式';
+                localStorage.setItem('darkMode', 'false');
+            } else {
+                body.classList.add('dark-mode');
+                button.textContent = '☀️ 日间模式';
+                localStorage.setItem('darkMode', 'true');
+            }
+        }
+
+        // 页面加载时检查本地存储的主题偏好
+        function initTheme() {
+            const isDarkMode = localStorage.getItem('darkMode') === 'true';
+            const body = document.body;
+            const button = document.querySelector('button[onclick="toggleDarkMode()"]');
+            
+            if (isDarkMode) {
+                body.classList.add('dark-mode');
+                button.textContent = '☀️ 日间模式';
+            }
+        }
+
         setInterval(fetchDataAndUpdateTables, 100);
         fetchDataAndUpdateTables();
+        initTheme();
     </script>
 </body>
 
