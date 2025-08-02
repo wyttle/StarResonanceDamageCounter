@@ -57,7 +57,7 @@ let realtime_dps = {};
 
 async function main() {
     print('Welcome to use Damage Counter for Star Resonance by Dimole!');
-    print('Version: V2.0');
+    print('Version: V2.1');
     for (let i = 0; i < devices.length; i++) {
         print(i + '.\t' + devices[i].description);
     }
