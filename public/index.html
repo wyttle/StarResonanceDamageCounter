@@ -166,12 +166,31 @@
         .dark-mode .watermark {
             background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" opacity="0.08"><text x="0" y="20" font-size="20" fill="white">数据仅供参考</text></svg>') !important;
         }
+
+        .dark-mode select {
+            background-color: #424242 !important;
+            color: #e0e0e0 !important;
+            border-color: #666 !important;
+        }
+
+        .dark-mode label {
+            color: #e0e0e0 !important;
+        }
     </style>
 </head>
 
 <body>
     <h1>🎯 星痕共鸣实时战斗数据展示 V2.0</h1>
     <h3>⚠ 暂未区分治疗量与伤害量，将合并计算，数据仅供参考</h3>
+    <div style="margin: 20px 0;">
+        <label for="sortSelect" style="margin-right: 10px; font-weight: bold;">排序方式:</label>
+        <select id="sortSelect" onchange="updateSortMode()" style="padding: 8px 12px; font-size: 14px; border-radius: 5px; border: 1px solid #ddd; background-color: white;">
+            <option value="uid">按UID排序 (升序)</option>
+            <option value="damage">按总伤害排序 (降序)</option>
+            <option value="dps">按总DPS排序 (降序)</option>
+            <option value="realtimeDpsMax">按最大瞬时DPS排序 (降序)</option>
+        </select>
+    </div>
     <button onclick="clearData()">✨ 清空统计数据</button>
     <button onclick="toggleDarkMode()">🌙 夜间模式</button>
 
@@ -179,16 +198,16 @@
         <table id="damageTable">
             <thead>
                 <tr>
-                    <th>角色 ID</th>
-                    <th>总伤害/治疗</th>
-                    <th>纯暴击</th>
-                    <th>纯幸运</th>
-                    <th>暴击幸运</th>
-                    <th>暴击率</th>
-                    <th>幸运率</th>
-                    <th>瞬时DPS/HPS</th>
-                    <th>最大瞬时</th>
-                    <th>总DPS/HPS</th>
+                    <th title="角色唯一标识符">角色 ID</th>
+                    <th title="角色在战斗中造成的总伤害和治疗量">总伤害/治疗</th>
+                    <th title="角色在战斗中造成的非幸运的暴击伤害和治疗量">纯暴击</th>
+                    <th title="角色在战斗中造成的非暴击的幸运伤害和治疗量">纯幸运</th>
+                    <th title="角色在战斗中造成的暴击的幸运伤害和治疗量">暴击幸运</th>
+                    <th title="角色在战斗中的暴击触发率">暴击率</th>
+                    <th title="角色在战斗中的幸运触发率">幸运率</th>
+                    <th title="角色在战斗中的瞬时DPS/HPS">瞬时DPS/HPS</th>
+                    <th title="角色在战斗中的最大瞬时DPS/HPS">最大瞬时</th>
+                    <th title="角色在战斗中的总DPS/HPS">总DPS/HPS</th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -200,26 +219,66 @@
     <footer style="margin-top: 40px; font-size: 14px; color: #888;">Copyright © 2025 Made with ❤️ by <a href="https://dml.ink" target="_blank">Dimole</a></footer>
 
     <script>
+        let currentSortMode = 'uid'; // 默认按UID排序
+
         async function fetchDataAndUpdateTables() {
             try {
                 const res = await fetch('/api/data');
                 const data = await res.json();
                 const damageTable = document.getElementById('damageTable').querySelector('tbody');
                 damageTable.innerHTML = '';
-                for (const id in data.user) {
-                    const crit_rate = data.user[id].total_count.critical / data.user[id].total_count.total;
-                    const lucky_rate = data.user[id].total_count.lucky / data.user[id].total_count.total;
-                    const row = `<tr><td>${id}</td><td>${data.user[id].total_damage.total}</td>` +
-                                `<td>${data.user[id].total_damage.critical}</td><td>${data.user[id].total_damage.lucky}</td>` +
-                                `<td>${data.user[id].total_damage.crit_lucky}</td>` +
+                
+                // 将数据转换为数组以便排序
+                const userArray = Object.keys(data.user).map(id => ({
+                    id: Number(id),
+                    ...data.user[id]
+                }));
+                
+                // 根据当前排序模式排序
+                sortUserArray(userArray);
+                
+                // 生成表格行
+                for (const user of userArray) {
+                    const crit_rate = user.total_count.critical / user.total_count.total;
+                    const lucky_rate = user.total_count.lucky / user.total_count.total;
+                    const row = `<tr><td>${user.id}</td><td>${user.total_damage.total}</td>` +
+                                `<td>${user.total_damage.critical}</td><td>${user.total_damage.lucky}</td>` +
+                                `<td>${user.total_damage.crit_lucky}</td>` +
                                 `<td>${(crit_rate * 100).toFixed(2)}%</td><td>${(lucky_rate * 100).toFixed(2)}%</td>` +
-                                `<td>${data.user[id].realtime_dps}</td><td>${data.user[id].realtime_dps_max}</td>` +
-                                `<td>${data.user[id].total_dps}</td></tr>`;
+                                `<td>${user.realtime_dps}</td><td>${user.realtime_dps_max}</td>` +
+                                `<td>${user.total_dps}</td></tr>`;
                     damageTable.innerHTML += row;
                 }
             } catch (err) {
                 console.error('获取数据失败：', err);
             }
+        }
+
+        function sortUserArray(userArray) {
+            switch (currentSortMode) {
+                case 'damage':
+                    userArray.sort((a, b) => b.total_damage.total - a.total_damage.total);
+                    break;
+                case 'uid':
+                    userArray.sort((a, b) => a.id - b.id);
+                    break;
+                case 'dps':
+                    userArray.sort((a, b) => b.total_dps - a.total_dps);
+                    break;
+                case 'realtimeDpsMax':
+                    userArray.sort((a, b) => b.realtime_dps_max - a.realtime_dps_max);
+                    break;
+                default:
+                    userArray.sort((a, b) => a.id - b.id);
+                    break;
+            }
+        }
+
+        function updateSortMode() {
+            const select = document.getElementById('sortSelect');
+            currentSortMode = select.value;
+            localStorage.setItem('sortMode', currentSortMode);
+            fetchDataAndUpdateTables();
         }
 
         async function clearData() {
@@ -244,7 +303,7 @@
             }
         }
 
-        // 页面加载时检查本地存储的主题偏好
+        // 页面加载时检查本地存储的主题偏好和排序偏好
         function initTheme() {
             const isDarkMode = localStorage.getItem('darkMode') === 'true';
             const body = document.body;
@@ -256,9 +315,18 @@
             }
         }
 
+        function initSortMode() {
+            const savedSortMode = localStorage.getItem('sortMode');
+            if (savedSortMode) {
+                currentSortMode = savedSortMode;
+                document.getElementById('sortSelect').value = savedSortMode;
+            }
+        }
+
         setInterval(fetchDataAndUpdateTables, 100);
         fetchDataAndUpdateTables();
         initTheme();
+        initSortMode();
     </script>
 </body>
 
