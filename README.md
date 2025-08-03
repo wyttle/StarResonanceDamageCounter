@@ -26,7 +26,7 @@
 
 ### 前置要求
 
-- **Node.js** >= 18.15.0
+- **Node.js** >= 22.15.0
 - **pnpm** >= 10.13.1
 - **WinPcap/Npcap** (网络抓包驱动)
 - **Visual Studio Build Tools** (编译依赖) 
