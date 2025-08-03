@@ -177,6 +177,7 @@ async function main() {
         try {
             if (buf.length < 32) return;
             if (buf[4] & 0x80) {//zstd
+                if (!zlib.zstdDecompressSync) logger.warn('zstdDecompressSync is not available! Please check your Node.js version!');
                 const decompressed = zlib.zstdDecompressSync(buf.subarray(10));
                 buf = Buffer.concat([buf.subarray(0, 10), decompressed]);
             }
