@@ -217,6 +217,7 @@ async function main() {
                                         if (!is_player) break; //排除怪物攻击
                                         const operator_uid = BigInt(hit[21] || hit[11]) >> 16n;
                                         if (!operator_uid) break;
+                                        if (typeof damage !== 'number') break;
 
                                         //初始化
                                         if (!total_damage[operator_uid]) total_damage[operator_uid] = {
