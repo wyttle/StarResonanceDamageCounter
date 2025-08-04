@@ -312,7 +312,9 @@
         let visibleUsers = JSON.parse(localStorage.getItem('visibleUsers') || '{}');
         let dpsHistory = {}; // 存储每个用户的DPS历史数据
         let chart = null;
-        const MAX_HISTORY_LENGTH = 600; // 60秒 * 10次/秒
+        const HISTORY_DURATION_SECONDS = 60; // 历史记录时长（秒）
+        const HISTORY_FREQUENCY_PER_SECOND = 10; // 每秒记录次数
+        const MAX_HISTORY_LENGTH = HISTORY_DURATION_SECONDS * HISTORY_FREQUENCY_PER_SECOND; // 60秒 * 10次/秒
         let chartDatasetMap = {}; // 缓存数据集索引，避免重建
         let lastUpdateTime = 0;
         let chartInitialized = false; // 标记图表是否已初始化
