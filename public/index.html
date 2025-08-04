@@ -481,7 +481,7 @@
             performanceMode = false;
             
             // 清空ECharts图表
-            if (chart) {
+            if (chart && typeof chart.setOption === 'function') {
                 chart.setOption({
                     series: [],
                     xAxis: {
