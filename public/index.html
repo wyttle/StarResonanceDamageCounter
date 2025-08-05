@@ -679,6 +679,45 @@
             
             chart.setOption(option);
             
+            // 监听图例的选择变化事件，同步控制面板复选框状态
+            chart.on('legendselectchanged', function (params) {
+                const seriesName = params.name;
+                const isSelected = params.selected[seriesName];
+                
+                // 查找对应的用户ID
+                let userId = null;
+                
+                // 检查是否是UID格式的昵称
+                const uidMatch = seriesName.match(/UID:(\d+)/);
+                if (uidMatch) {
+                    userId = uidMatch[1];
+                } else {
+                    // 查找自定义昵称对应的userId
+                    userId = Object.keys(userNicknames).find(id => userNicknames[id] === seriesName);
+                }
+                
+                if (userId) {
+                    const userIdStr = String(userId);
+                    
+                    // 同步visibleUsers状态
+                    if (isSelected) {
+                        delete visibleUsers[userIdStr];
+                    } else {
+                        visibleUsers[userIdStr] = false;
+                    }
+                    localStorage.setItem('visibleUsers', JSON.stringify(visibleUsers));
+                    
+                    // 同步控制面板复选框状态
+                    const controlElement = document.querySelector(`[data-user-id="${userIdStr}"]`);
+                    if (controlElement) {
+                        const checkbox = controlElement.querySelector('.visibility-checkbox');
+                        if (checkbox) {
+                            checkbox.checked = isSelected;
+                        }
+                    }
+                }
+            });
+            
             // 响应窗口大小变化
             window.addEventListener('resize', () => {
                 chart.resize();
@@ -719,7 +758,7 @@
             const currentSeries = currentOption.series || [];
             
             // 生成时间轴数据 (只在初次或数据长度变化时更新)
-            if (!chartInitialized || currentOption.xAxis[0].data.length !== dataLength) {
+            if (!chartInitialized || !currentOption.xAxis || !currentOption.xAxis[0] || currentOption.xAxis[0].data.length !== dataLength) {
                 const xAxisData = [];
                 for (let i = 0; i < dataLength; i++) {
                     xAxisData.push('');
@@ -832,16 +871,38 @@
                 }
             });
             
-            // 使用增量更新，避免完全重绘
+            // 构建图例选中状态对象
+            const legendSelected = {};
+            updatedSeries.forEach(series => {
+                const seriesName = series.name;
+                // 检查是否是UID格式的昵称
+                const uidMatch = seriesName.match(/UID:(\d+)/);
+                let userId = null;
+                
+                if (uidMatch) {
+                    userId = uidMatch[1];
+                } else {
+                    // 查找自定义昵称对应的userId
+                    userId = Object.keys(userNicknames).find(id => userNicknames[id] === seriesName);
+                }
+                
+                // 确保userId是字符串类型进行比较
+                const userIdStr = userId ? String(userId) : null;
+                
+                // 根据visibleUsers设置图例选中状态
+                legendSelected[seriesName] = !(userIdStr && visibleUsers[userIdStr] === false);
+            });
+            
+            // 使用ECharts内置的图例机制，统一处理显示/隐藏
             chart.setOption({
                 series: updatedSeries,
-                // 同时更新主题相关样式（避免深色模式切换时的闪烁）
                 legend: {
+                    selected: legendSelected,
                     textStyle: {
                         color: document.body.classList.contains('dark-mode') ? '#cbd5e1' : '#666'
                     }
                 }
-            }, false, true); // notMerge=false, lazyUpdate=true
+            }, false, true);
             
             // 更新状态显示
             updateChartStatus(priorityUsers.length, Object.keys(dpsHistory).length);
@@ -862,17 +923,28 @@
             const existingControls = new Set(Array.from(controlsList.children).map(el => el.dataset.userId));
             
             for (const user of userArray) {
-                if (existingControls.has(String(user.id))) continue;
+                const userIdStr = String(user.id);
                 
-                const nickname = userNicknames[user.id] || `UID:${user.id}`;
-                const isVisible = visibleUsers[user.id] !== false;
+                if (existingControls.has(userIdStr)) {
+                    // 更新已存在控件的复选框状态
+                    const existingControl = controlsList.querySelector(`[data-user-id="${userIdStr}"]`);
+                    if (existingControl) {
+                        const checkbox = existingControl.querySelector('.visibility-checkbox');
+                        const isVisible = visibleUsers[userIdStr] !== false;
+                        checkbox.checked = isVisible;
+                    }
+                    continue;
+                }
+                
+                const nickname = userNicknames[userIdStr] || `UID:${user.id}`;
+                const isVisible = visibleUsers[userIdStr] !== false;
                 
                 const controlDiv = document.createElement('div');
                 controlDiv.className = 'user-controls';
-                controlDiv.dataset.userId = user.id;
+                controlDiv.dataset.userId = userIdStr;
                 controlDiv.innerHTML = `
                     <input type="checkbox" class="visibility-checkbox" ${isVisible ? 'checked' : ''} onchange="toggleUserVisibility(${user.id}, this.checked)">
-                    <input type="text" class="user-nickname-input" value="${userNicknames[user.id] || ''}" placeholder="昵称" onchange="updateNickname(${user.id}, this.value)" oninput="updateNickname(${user.id}, this.value)">
+                    <input type="text" class="user-nickname-input" value="${userNicknames[userIdStr] || ''}" placeholder="昵称" onchange="updateNickname(${user.id}, this.value)" oninput="updateNickname(${user.id}, this.value)">
                     <span class="user-uid">(UID:${user.id})</span>
                 `;
                 
@@ -892,12 +964,27 @@
         
         // 切换用户可见性
         function toggleUserVisibility(userId, isVisible) {
+            // 确保userId是字符串类型
+            const userIdStr = String(userId);
+            
             if (isVisible) {
-                delete visibleUsers[userId];
+                delete visibleUsers[userIdStr];
             } else {
-                visibleUsers[userId] = false;
+                visibleUsers[userIdStr] = false;
             }
             localStorage.setItem('visibleUsers', JSON.stringify(visibleUsers));
+            
+            // 使用ECharts的dispatchAction来切换图例，这样与图例点击行为完全一致
+            if (chart) {
+                // 找到对应的series名称
+                const nickname = userNicknames[userIdStr] || `UID:${userId}`;
+                
+                // 通过ECharts API切换图例选中状态
+                chart.dispatchAction({
+                    type: 'legendToggleSelect',
+                    name: nickname
+                });
+            }
         }
         
         // 全选/取消全选
