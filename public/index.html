@@ -800,7 +800,7 @@
                 chartInitialized = true;
             }
             
-            // 增量更新series - 关键优化
+            // 更新series
             const updatedSeries = [];
             const existingSeriesMap = {};
             
@@ -1027,17 +1027,55 @@
             const checkboxes = document.querySelectorAll('.visibility-checkbox');
             const allChecked = Array.from(checkboxes).every(cb => cb.checked);
             
+            // 批量更新所有用户的可见性状态
             checkboxes.forEach(cb => {
                 cb.checked = !allChecked;
                 const userId = cb.parentElement.dataset.userId;
+                
                 if (!allChecked) {
+                    // 全选：显示所有用户
                     delete visibleUsers[userId];
                 } else {
+                    // 取消全选：隐藏所有用户
                     visibleUsers[userId] = false;
                 }
             });
             
             localStorage.setItem('visibleUsers', JSON.stringify(visibleUsers));
+            
+            // 批量同步图例状态
+            if (chart) {
+                checkboxes.forEach(cb => {
+                    const userId = cb.parentElement.dataset.userId;
+                    const nickname = userNicknames[userId] || `UID:${userId}`;
+                    
+                    // 设置标志防止递归触发
+                    isUpdatingFromLegend = true;
+                    
+                    // 通过ECharts API同步图例状态
+                    if (!allChecked) {
+                        // 全选：显示图例
+                        chart.dispatchAction({
+                            type: 'legendSelect',
+                            name: nickname
+                        });
+                    } else {
+                        // 取消全选：隐藏图例
+                        chart.dispatchAction({
+                            type: 'legendUnSelect',
+                            name: nickname
+                        });
+                    }
+                });
+                
+                // 重置标志
+                setTimeout(() => {
+                    isUpdatingFromLegend = false;
+                }, 200);
+            }
+            
+            // 触发数据更新，重新渲染表格
+            fetchDataAndUpdateTables();
         }
         
         // 清空所有昵称
