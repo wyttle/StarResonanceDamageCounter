@@ -61,6 +61,12 @@ class StatisticData {
             hpLessen: 0, // 仅用于伤害统计
             total: 0,
         };
+        this.count = {
+            normal: 0,
+            critical: 0,
+            lucky: 0,
+            total: 0,
+        };
         this.realtimeWindow = []; // 实时统计窗口
         this.timeRange = []; // 时间范围 [开始时间, 最后时间]
         this.realtimeStats = {
@@ -78,6 +84,7 @@ class StatisticData {
     addRecord(value, isCrit, isLucky, hpLessenValue = 0) {
         const now = Date.now();
 
+        // 更新数值统计
         if (isCrit) {
             if (isLucky) {
                 this.stats.crit_lucky += value;
@@ -89,9 +96,20 @@ class StatisticData {
         } else {
             this.stats.normal += value;
         }
-
         this.stats.total += value;
         this.stats.hpLessen += hpLessenValue;
+
+        // 更新次数统计
+        if (isCrit) {
+            this.count.critical++;
+        }
+        if (isLucky) {
+            this.count.lucky++;
+        }
+        if (!isCrit && !isLucky) {
+            this.count.normal++;
+        }
+        this.count.total++;
 
         this.realtimeWindow.push({
             time: now,
@@ -146,6 +164,12 @@ class StatisticData {
             hpLessen: 0,
             total: 0,
         };
+        this.count = {
+            normal: 0,
+            critical: 0,
+            lucky: 0,
+            total: 0,
+        };
         this.realtimeWindow = [];
         this.timeRange = [];
         this.realtimeStats = {
@@ -160,12 +184,6 @@ class UserData {
         this.uid = uid;
         this.damageStats = new StatisticData();
         this.healingStats = new StatisticData();
-        this.totalCount = {
-            normal: 0,
-            critical: 0,
-            lucky: 0,
-            total: 0,
-        };
         this.takenDamage = 0; // 承伤
         this.profession = '未知';
     }
@@ -178,7 +196,6 @@ class UserData {
      */
     addDamage(damage, isCrit, isLucky, hpLessenValue = 0) {
         this.damageStats.addRecord(damage, isCrit, isLucky, hpLessenValue);
-        this._updateTotalCount(isCrit, isLucky);
     }
 
     /** 添加治疗记录
@@ -188,7 +205,6 @@ class UserData {
      */
     addHealing(healing, isCrit, isLucky) {
         this.healingStats.addRecord(healing, isCrit, isLucky);
-        this._updateTotalCount(isCrit, isLucky);
     }
 
     /** 添加承伤记录
@@ -203,23 +219,6 @@ class UserData {
      * */
     setProfession(profession) {
         this.profession = profession;
-    }
-
-    /** 更新统一的暴击和幸运统计
-     * @param {boolean} isCrit - 是否为暴击
-     * @param {boolean} isLucky - 是否为幸运
-     */
-    _updateTotalCount(isCrit, isLucky) {
-        this.totalCount.total++;
-        if (isCrit) {
-            this.totalCount.critical++;
-        }
-        if (isLucky) {
-            this.totalCount.lucky++;
-        }
-        if (!isCrit && !isLucky) {
-            this.totalCount.normal++;
-        }
     }
 
     /** 更新实时DPS和HPS 计算过去1秒内的总伤害和治疗 */
@@ -238,6 +237,16 @@ class UserData {
         return this.healingStats.getTotalPerSecond();
     }
 
+    /** 获取合并的次数统计 */
+    getTotalCount() {
+        return {
+            normal: this.damageStats.count.normal + this.healingStats.count.normal,
+            critical: this.damageStats.count.critical + this.healingStats.count.critical,
+            lucky: this.damageStats.count.lucky + this.healingStats.count.lucky,
+            total: this.damageStats.count.total + this.healingStats.count.total,
+        };
+    }
+
     /** 获取用户数据摘要 */
     getSummary() {
         return {
@@ -245,7 +254,7 @@ class UserData {
             realtime_dps_max: this.damageStats.realtimeStats.max,
             total_dps: this.getTotalDps(),
             total_damage: { ...this.damageStats.stats },
-            total_count: this.totalCount,
+            total_count: this.getTotalCount(),
             realtime_hps: this.healingStats.realtimeStats.value,
             realtime_hps_max: this.healingStats.realtimeStats.max,
             total_hps: this.getTotalHps(),
@@ -259,12 +268,6 @@ class UserData {
     reset() {
         this.damageStats.reset();
         this.healingStats.reset();
-        this.totalCount = {
-            normal: 0,
-            critical: 0,
-            lucky: 0,
-            total: 0,
-        };
         this.takenDamage = 0;
         this.profession = '未知';
     }
