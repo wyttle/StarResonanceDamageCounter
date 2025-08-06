@@ -78,21 +78,21 @@ class UserData {
     /** 添加伤害记录
      * @param {number} damage - 伤害值
      * @param {boolean} isCrit - 是否为暴击
-     * @param {number} [luckyValue] - 是否为幸运
+     * @param {boolean} [isLucky] - 是否为幸运
      * @param {number} hpLessenValue - 生命值减少量
      */
-    addDamage(damage, isCrit, luckyValue, hpLessenValue = 0) {
+    addDamage(damage, isCrit, isLucky, hpLessenValue = 0) {
         const now = Date.now();
 
         if (isCrit) {
             this.totalCount.critical++;
-            if (luckyValue) {
+            if (isLucky) {
                 this.totalDamage.crit_lucky += damage;
                 this.totalCount.lucky++;
             } else {
                 this.totalDamage.critical += damage;
             }
-        } else if (luckyValue) {
+        } else if (isLucky) {
             this.totalDamage.lucky += damage;
             this.totalCount.lucky++;
         } else {
@@ -196,12 +196,12 @@ class UserDataManager {
      * @param {number} uid - 造成伤害的用户ID
      * @param {number} damage - 伤害值
      * @param {boolean} isCrit - 是否为暴击
-     * @param {number} [luckyValue] - 是否为幸运
+     * @param {boolean} [isLucky] - 是否为幸运
      * @param {number} hpLessenValue - 生命值减少量
      */
-    addDamage(uid, damage, isCrit, luckyValue, hpLessenValue = 0) {
+    addDamage(uid, damage, isCrit, isLucky, hpLessenValue = 0) {
         const user = this.getUser(uid);
-        user.addDamage(damage, isCrit, luckyValue, hpLessenValue);
+        user.addDamage(damage, isCrit, isLucky, hpLessenValue);
     }
 
     /** 更新所有用户的实时DPS */
@@ -343,7 +343,7 @@ async function main() {
                                         const skill = hit[12];
                                         if (typeof skill !== 'number') continue;
                                         const value = hit[6], luckyValue = hit[8], isMiss = !!hit[2], isCrit = !!hit[5], hpLessenValue = hit[9] ?? 0;
-                                        const targetUUID = b[1], isHeal = hit[4] === 2, isDead = !!hit[17];
+                                        const targetUUID = b[1], isHeal = hit[4] === 2, isDead = !!hit[17], isLucky = !!luckyValue;
                                         const damage = value ?? luckyValue ?? 0;
                                         if (typeof damage !== 'number') continue;
                                         const is_player = (BigInt(hit[21] || hit[11]) & 0xffffn) === 640n;
@@ -352,11 +352,11 @@ async function main() {
                                         if (!operator_uid) continue;
                                         const overHit = damage - hpLessenValue;
 
-                                        userDataManager.addDamage(operator_uid, damage, isCrit, luckyValue, hpLessenValue);
+                                        userDataManager.addDamage(operator_uid, damage, isCrit, isLucky, hpLessenValue);
 
                                         let extra = [];
                                         if (isCrit) extra.push('Crit');
-                                        if (luckyValue) extra.push('Lucky');
+                                        if (isLucky) extra.push('Lucky');
                                         if (extra.length === 0) extra = ['Normal'];
 
                                         logger.info('User: ' + operator_uid + ' Skill: ' + skill + ' Damage/Healing: ' + damage +
