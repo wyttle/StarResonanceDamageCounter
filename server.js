@@ -489,7 +489,7 @@ async function main() {
                                         if (typeof skill !== 'number') continue;
                                         const value = hit[6], luckyValue = hit[8], isMiss = !!hit[2], isCrit = !!hit[5], hpLessenValue = hit[9] ?? 0;
                                         const isHeal = hit[4] === 2, isDead = !!hit[17], isLucky = !!luckyValue;
-                                        const operatorUUID = hit[11], targetUUID = b[1];
+                                        const operatorUUID = hit[21] || hit[11], targetUUID = b[1];
                                         const damage = value ?? luckyValue ?? 0;
                                         if (typeof damage !== 'number') continue;
                                         const operator_is_player = (BigInt(operatorUUID) & 0xffffn) === 640n;
