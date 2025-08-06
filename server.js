@@ -108,18 +108,18 @@ class StatisticData {
     /** 更新实时统计 */
     updateRealtimeStats() {
         const now = Date.now();
-        
+
         // 清除超过1秒的数据
         while (this.realtimeWindow.length > 0 && now - this.realtimeWindow[0].time > 1000) {
             this.realtimeWindow.shift();
         }
-        
+
         // 计算当前实时值
         this.realtimeStats.value = 0;
         for (const entry of this.realtimeWindow) {
             this.realtimeStats.value += entry.value;
         }
-        
+
         // 更新最大值
         if (this.realtimeStats.value > this.realtimeStats.max) {
             this.realtimeStats.max = this.realtimeStats.value;
@@ -167,6 +167,7 @@ class UserData {
             total: 0,
         };
         this.takenDamage = 0; // 承伤
+        this.profession = '未知';
     }
 
     /** 添加伤害记录
@@ -195,6 +196,13 @@ class UserData {
      * */
     addTakenDamage(damage) {
         this.takenDamage += damage;
+    }
+
+    /** 设置职业
+     * @param {string} profession - 职业名称
+     * */
+    setProfession(profession) {
+        this.profession = profession;
     }
 
     /** 更新统一的暴击和幸运统计
@@ -243,6 +251,7 @@ class UserData {
             total_hps: this.getTotalHps(),
             total_healing: { ...this.healingStats.stats },
             taken_damage: this.takenDamage,
+            profession: this.profession,
         };
     }
 
@@ -257,6 +266,7 @@ class UserData {
             total: 0,
         };
         this.takenDamage = 0;
+        this.profession = '未知';
     }
 }
 
@@ -307,6 +317,15 @@ class UserDataManager {
     addTakenDamage(uid, damage) {
         const user = this.getUser(uid);
         user.addTakenDamage(damage);
+    }
+
+    /** 设置用户职业
+     * @param {number} uid - 用户ID
+     * @param {string} profession - 职业名称
+     * */
+    setProfession(uid, profession) {
+        const user = this.getUser(uid);
+        user.setProfession(profession);
     }
 
     /** 更新所有用户的实时DPS和HPS */
@@ -476,6 +495,62 @@ async function main() {
                                                     userDataManager.addDamage(operator_uid, damage, isCrit, isLucky, hpLessenValue);
                                                 }
                                             }
+                                        }
+
+                                        //判断职业
+                                        if (operator_is_player) {
+                                            let roleName;
+                                            switch (skill) {
+                                                case 1241:
+                                                    roleName = '射线';
+                                                    break;
+                                                case 55302:
+                                                    roleName = '协奏';
+                                                    break;
+                                                case 20301:
+                                                    roleName = '愈合';
+                                                    break;
+                                                case 1518:
+                                                    roleName = '惩戒';
+                                                    break;
+                                                case 2306:
+                                                    roleName = '狂音';
+                                                    break;
+                                                case 120902:
+                                                    roleName = '冰矛';
+                                                    break;
+                                                case 1714:
+                                                    roleName = '居合';
+                                                    break;
+                                                case 44701:
+                                                    roleName = '月刃';
+                                                    break;
+                                                case 220112:
+                                                case 2203622:
+                                                    roleName = '鹰弓';
+                                                    break;
+                                                case 1700827:
+                                                    roleName = '狼弓';
+                                                    break;
+                                                case 1419:
+                                                    roleName = '空枪';
+                                                    break;
+                                                case 1418:
+                                                    roleName = '重装';
+                                                    break;
+                                                case 2405:
+                                                    roleName = '防盾';
+                                                    break;
+                                                case 2406:
+                                                    roleName = '光盾';
+                                                    break;
+                                                case 199902:
+                                                    roleName = '岩盾';
+                                                    break;
+                                                default:
+                                                    break;
+                                            }
+                                            if (roleName) userDataManager.setProfession(operator_uid, roleName);
                                         }
 
                                         let extra = [];
