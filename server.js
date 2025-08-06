@@ -131,7 +131,9 @@ class StatisticData {
         if (!this.timeRange[0] || !this.timeRange[1]) {
             return 0;
         }
-        return (this.stats.total / (this.timeRange[1] - this.timeRange[0]) * 1000) || 0;
+        const totalPerSecond = (this.stats.total / (this.timeRange[1] - this.timeRange[0]) * 1000) || 0;
+        if (!Number.isFinite(totalPerSecond)) return 0;
+        return totalPerSecond;
     }
 
     /** 重置数据 */
