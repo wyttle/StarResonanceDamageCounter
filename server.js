@@ -186,16 +186,24 @@ class UserData {
         this.healingStats = new StatisticData();
         this.takenDamage = 0; // 承伤
         this.profession = '未知';
+        this.skillUsage = new Map(); // 技能使用情况
     }
 
     /** 添加伤害记录
+     * @param {number} skillId - 技能ID/Buff ID
      * @param {number} damage - 伤害值
      * @param {boolean} isCrit - 是否为暴击
      * @param {boolean} [isLucky] - 是否为幸运
      * @param {number} hpLessenValue - 生命值减少量
      */
-    addDamage(damage, isCrit, isLucky, hpLessenValue = 0) {
+    addDamage(skillId, damage, isCrit, isLucky, hpLessenValue = 0) {
         this.damageStats.addRecord(damage, isCrit, isLucky, hpLessenValue);
+        // 记录技能使用情况
+        if (!this.skillUsage.has(skillId)) {
+            this.skillUsage.set(skillId, new StatisticData());
+        }
+        this.skillUsage.get(skillId).addRecord(damage, isCrit, isLucky, hpLessenValue);
+        this.skillUsage.get(skillId).realtimeWindow.length = 0;
     }
 
     /** 添加治疗记录
@@ -270,6 +278,7 @@ class UserData {
         this.healingStats.reset();
         this.takenDamage = 0;
         this.profession = '未知';
+        this.skillUsage.clear();
     }
 }
 
@@ -292,14 +301,15 @@ class UserDataManager {
 
     /** 添加伤害记录
      * @param {number} uid - 造成伤害的用户ID
+     * @param {number} skillId - 技能ID/Buff ID
      * @param {number} damage - 伤害值
      * @param {boolean} isCrit - 是否为暴击
      * @param {boolean} [isLucky] - 是否为幸运
      * @param {number} hpLessenValue - 生命值减少量
      */
-    addDamage(uid, damage, isCrit, isLucky, hpLessenValue = 0) {
+    addDamage(uid, skillId, damage, isCrit, isLucky, hpLessenValue = 0) {
         const user = this.getUser(uid);
-        user.addDamage(damage, isCrit, isLucky, hpLessenValue);
+        user.addDamage(skillId, damage, isCrit, isLucky, hpLessenValue);
     }
 
     /** 添加治疗记录
@@ -513,7 +523,7 @@ async function main() {
                                             }
                                             else { //非玩家受到伤害
                                                 if (operator_is_player) { //只记录玩家造成的伤害
-                                                    userDataManager.addDamage(operator_uid, damage, isCrit, isLucky, hpLessenValue);
+                                                    userDataManager.addDamage(operator_uid, skill, damage, isCrit, isLucky, hpLessenValue);
                                                 }
                                             }
                                         }
