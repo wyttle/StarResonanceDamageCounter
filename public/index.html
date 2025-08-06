@@ -286,16 +286,30 @@
         <table id="damageTable">
             <thead>
                 <tr>
-                    <th title="角色唯一标识符/自定义昵称">角色昵称</th>
-                    <th title="角色在战斗中造成的总伤害和治疗量">总伤害/治疗</th>
-                    <th title="角色在战斗中造成的非幸运的暴击伤害和治疗量">纯暴击</th>
-                    <th title="角色在战斗中造成的非暴击的幸运伤害和治疗量">纯幸运</th>
-                    <th title="角色在战斗中造成的暴击的幸运伤害和治疗量">暴击幸运</th>
-                    <th title="角色在战斗中的暴击触发率">暴击率</th>
-                    <th title="角色在战斗中的幸运触发率">幸运率</th>
-                    <th title="角色在战斗中的最近一秒造成的伤害和治疗量">瞬时DPS/HPS</th>
-                    <th title="角色在战斗中的最大瞬时DPS/HPS">最大瞬时</th>
-                    <th title="角色在战斗中的总DPS/HPS（以第一次技能与最后一次技能之间的时间作为有效战斗时间计算）">总DPS/HPS</th>
+                    <th rowspan="2" title="角色唯一标识符/自定义昵称">角色昵称</th>
+                    <th rowspan="2" title="角色在战斗中受到的伤害">承伤</th>
+                    <th rowspan="2" title="角色在战斗中的暴击触发率">暴击率</th>
+                    <th rowspan="2" title="角色在战斗中的幸运触发率">幸运率</th>
+                    <th colspan="4">伤害</th>
+                    <th colspan="3">DPS</th>
+                    <th colspan="4">治疗</th>
+                    <th colspan="3">HPS</th>
+                </tr>
+                <tr>
+                    <th title="角色在战斗中造成的总伤害">总伤害</th>
+                    <th title="角色在战斗中造成的非幸运的暴击伤害">纯暴击</th>
+                    <th title="角色在战斗中造成的非暴击的幸运伤害">纯幸运</th>
+                    <th title="角色在战斗中造成的暴击的幸运伤害">暴击幸运</th>
+                    <th title="角色在战斗中的最近一秒造成的伤害">瞬时DPS</th>
+                    <th title="角色在战斗中的最大瞬时DPS">最大瞬时</th>
+                    <th title="角色在战斗中的总DPS（以第一次技能与最后一次技能之间的时间作为有效战斗时间计算）">总DPS</th>
+                    <th title="角色在战斗中造成的总治疗量">总治疗</th>
+                    <th title="角色在战斗中造成的非幸运的暴击治疗量">纯暴击</th>
+                    <th title="角色在战斗中造成的非暴击的幸运治疗量">纯幸运</th>
+                    <th title="角色在战斗中造成的暴击的幸运治疗量">暴击幸运</th>
+                    <th title="角色在战斗中的最近一秒造成的伤害和治疗量">瞬时HPS</th>
+                    <th title="角色在战斗中的最大瞬时HPS">最大瞬时</th>
+                    <th title="角色在战斗中的总HPS（以第一次技能与最后一次技能之间的时间作为有效战斗时间计算）">总HPS</th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -407,15 +421,23 @@
                     
                     // 其他数据列
                     const otherCells = [
+                        user.taken_damage,
+                        `${(crit_rate * 100).toFixed(2)}%`,
+                        `${(lucky_rate * 100).toFixed(2)}%`,
                         user.total_damage.total,
                         user.total_damage.critical,
                         user.total_damage.lucky,
                         user.total_damage.crit_lucky,
-                        `${(crit_rate * 100).toFixed(2)}%`,
-                        `${(lucky_rate * 100).toFixed(2)}%`,
                         user.realtime_dps,
                         user.realtime_dps_max,
-                        user.total_dps.toFixed(2)
+                        user.total_dps.toFixed(2),
+                        user.total_healing.total,
+                        user.total_healing.critical,
+                        user.total_healing.lucky,
+                        user.total_healing.crit_lucky,
+                        user.realtime_hps,
+                        user.realtime_hps_max,
+                        user.total_hps.toFixed(2),
                     ];
                     
                     otherCells.forEach(cellData => {
