@@ -50,10 +50,93 @@ class Lock {
     }
 }
 
-class UserData {
-    constructor(uid) {
-        this.uid = uid;
-        this.totalDamage = {
+// 通用统计类，用于处理伤害或治疗数据
+class StatisticData {
+    constructor() {
+        this.stats = {
+            normal: 0,
+            critical: 0,
+            lucky: 0,
+            crit_lucky: 0,
+            hpLessen: 0, // 仅用于伤害统计
+            total: 0,
+        };
+        this.realtimeWindow = []; // 实时统计窗口
+        this.timeRange = []; // 时间范围 [开始时间, 最后时间]
+        this.realtimeStats = {
+            value: 0,
+            max: 0,
+        };
+    }
+
+    /** 添加数据记录
+     * @param {number} value - 数值
+     * @param {boolean} isCrit - 是否为暴击
+     * @param {boolean} isLucky - 是否为幸运
+     * @param {number} hpLessenValue - 生命值减少量（仅伤害使用）
+     */
+    addRecord(value, isCrit, isLucky, hpLessenValue = 0) {
+        const now = Date.now();
+
+        if (isCrit) {
+            if (isLucky) {
+                this.stats.crit_lucky += value;
+            } else {
+                this.stats.critical += value;
+            }
+        } else if (isLucky) {
+            this.stats.lucky += value;
+        } else {
+            this.stats.normal += value;
+        }
+
+        this.stats.total += value;
+        this.stats.hpLessen += hpLessenValue;
+
+        this.realtimeWindow.push({
+            time: now,
+            value,
+        });
+
+        if (this.timeRange[0]) {
+            this.timeRange[1] = now;
+        } else {
+            this.timeRange[0] = now;
+        }
+    }
+
+    /** 更新实时统计 */
+    updateRealtimeStats() {
+        const now = Date.now();
+        
+        // 清除超过1秒的数据
+        while (this.realtimeWindow.length > 0 && now - this.realtimeWindow[0].time > 1000) {
+            this.realtimeWindow.shift();
+        }
+        
+        // 计算当前实时值
+        this.realtimeStats.value = 0;
+        for (const entry of this.realtimeWindow) {
+            this.realtimeStats.value += entry.value;
+        }
+        
+        // 更新最大值
+        if (this.realtimeStats.value > this.realtimeStats.max) {
+            this.realtimeStats.max = this.realtimeStats.value;
+        }
+    }
+
+    /** 计算总的每秒统计值 */
+    getTotalPerSecond() {
+        if (!this.timeRange[0] || !this.timeRange[1]) {
+            return 0;
+        }
+        return (this.stats.total / (this.timeRange[1] - this.timeRange[0]) * 1000) || 0;
+    }
+
+    /** 重置数据 */
+    reset() {
+        this.stats = {
             normal: 0,
             critical: 0,
             lucky: 0,
@@ -61,17 +144,25 @@ class UserData {
             hpLessen: 0,
             total: 0,
         };
+        this.realtimeWindow = [];
+        this.timeRange = [];
+        this.realtimeStats = {
+            value: 0,
+            max: 0,
+        };
+    }
+}
+
+class UserData {
+    constructor(uid) {
+        this.uid = uid;
+        this.damageStats = new StatisticData();
+        this.healingStats = new StatisticData();
         this.totalCount = {
             normal: 0,
             critical: 0,
             lucky: 0,
             total: 0,
-        };
-        this.dpsWindow = [];
-        this.damageTime = [];
-        this.realtimeDps = {
-            value: 0,
-            max: 0,
         };
     }
 
@@ -82,95 +173,77 @@ class UserData {
      * @param {number} hpLessenValue - 生命值减少量
      */
     addDamage(damage, isCrit, isLucky, hpLessenValue = 0) {
-        const now = Date.now();
+        this.damageStats.addRecord(damage, isCrit, isLucky, hpLessenValue);
+        this._updateTotalCount(isCrit, isLucky);
+    }
 
+    /** 添加治疗记录
+     * @param {number} healing - 治疗值
+     * @param {boolean} isCrit - 是否为暴击
+     * @param {boolean} [isLucky] - 是否为幸运
+     */
+    addHealing(healing, isCrit, isLucky) {
+        this.healingStats.addRecord(healing, isCrit, isLucky);
+        this._updateTotalCount(isCrit, isLucky);
+    }
+
+    /** 更新统一的暴击和幸运统计
+     * @param {boolean} isCrit - 是否为暴击
+     * @param {boolean} isLucky - 是否为幸运
+     */
+    _updateTotalCount(isCrit, isLucky) {
+        this.totalCount.total++;
         if (isCrit) {
             this.totalCount.critical++;
-            if (isLucky) {
-                this.totalDamage.crit_lucky += damage;
-                this.totalCount.lucky++;
-            } else {
-                this.totalDamage.critical += damage;
-            }
-        } else if (isLucky) {
-            this.totalDamage.lucky += damage;
-            this.totalCount.lucky++;
-        } else {
-            this.totalDamage.normal += damage;
-            this.totalCount.normal++;
         }
-
-        this.totalDamage.total += damage;
-        this.totalDamage.hpLessen += hpLessenValue;
-        this.totalCount.total++;
-
-        this.dpsWindow.push({
-            time: now,
-            damage,
-        });
-
-        if (this.damageTime[0]) {
-            this.damageTime[1] = now;
-        } else {
-            this.damageTime[0] = now;
+        if (isLucky) {
+            this.totalCount.lucky++;
+        }
+        if (!isCrit && !isLucky) {
+            this.totalCount.normal++;
         }
     }
 
-    /** 更新实时DPS 计算过去1秒内的总伤害 */
+    /** 更新实时DPS和HPS 计算过去1秒内的总伤害和治疗 */
     updateRealtimeDps() {
-        const now = Date.now();
-        while (this.dpsWindow.length > 0 && now - this.dpsWindow[0].time > 1000) {
-            this.dpsWindow.shift();
-        }
-        this.realtimeDps.value = 0;
-        for (const entry of this.dpsWindow) {
-            this.realtimeDps.value += entry.damage;
-        }
-        if (this.realtimeDps.value > this.realtimeDps.max) {
-            this.realtimeDps.max = this.realtimeDps.value;
-        }
+        this.damageStats.updateRealtimeStats();
+        this.healingStats.updateRealtimeStats();
     }
 
     /** 计算总DPS */
     getTotalDps() {
-        if (!this.damageTime[0] || !this.damageTime[1]) {
-            return 0;
-        }
-        return (this.totalDamage.total / (this.damageTime[1] - this.damageTime[0]) * 1000) || 0;
+        return this.damageStats.getTotalPerSecond();
+    }
+
+    /** 计算总HPS */
+    getTotalHps() {
+        return this.healingStats.getTotalPerSecond();
     }
 
     /** 获取用户数据摘要 */
     getSummary() {
         return {
-            realtime_dps: this.realtimeDps.value,
-            realtime_dps_max: this.realtimeDps.max,
+            realtime_dps: this.damageStats.realtimeStats.value,
+            realtime_dps_max: this.damageStats.realtimeStats.max,
             total_dps: this.getTotalDps(),
-            total_damage: { ...this.totalDamage },
-            total_count: { ...this.totalCount },
+            total_damage: { ...this.damageStats.stats },
+            total_count: this.totalCount,
+            realtime_hps: this.healingStats.realtimeStats.value,
+            realtime_hps_max: this.healingStats.realtimeStats.max,
+            total_hps: this.getTotalHps(),
+            total_healing: { ...this.healingStats.stats },
         };
     }
 
     /** 重置数据 预留 */
     reset() {
-        this.totalDamage = {
-            normal: 0,
-            critical: 0,
-            lucky: 0,
-            crit_lucky: 0,
-            hpLessen: 0,
-            total: 0,
-        };
+        this.damageStats.reset();
+        this.healingStats.reset();
         this.totalCount = {
             normal: 0,
             critical: 0,
             lucky: 0,
             total: 0,
-        };
-        this.dpsWindow = [];
-        this.damageTime = [];
-        this.realtimeDps = {
-            value: 0,
-            max: 0,
         };
     }
 }
@@ -204,7 +277,18 @@ class UserDataManager {
         user.addDamage(damage, isCrit, isLucky, hpLessenValue);
     }
 
-    /** 更新所有用户的实时DPS */
+    /** 添加治疗记录
+     * @param {number} uid - 进行治疗的用户ID
+     * @param {number} healing - 治疗值
+     * @param {boolean} isCrit - 是否为暴击
+     * @param {boolean} [isLucky] - 是否为幸运
+     */
+    addHealing(uid, healing, isCrit, isLucky) {
+        const user = this.getUser(uid);
+        user.addHealing(healing, isCrit, isLucky);
+    }
+
+    /** 更新所有用户的实时DPS和HPS */
     updateAllRealtimeDps() {
         for (const user of this.users.values()) {
             user.updateRealtimeDps();
@@ -352,15 +436,20 @@ async function main() {
                                         if (!operator_uid) continue;
                                         const overHit = damage - hpLessenValue;
 
-                                        userDataManager.addDamage(operator_uid, damage, isCrit, isLucky, hpLessenValue);
+                                        if (isHeal) {
+                                            userDataManager.addHealing(operator_uid, damage, isCrit, isLucky);
+                                        } else {
+                                            userDataManager.addDamage(operator_uid, damage, isCrit, isLucky, hpLessenValue);
+                                        }
 
                                         let extra = [];
                                         if (isCrit) extra.push('Crit');
                                         if (isLucky) extra.push('Lucky');
                                         if (extra.length === 0) extra = ['Normal'];
 
-                                        logger.info('User: ' + operator_uid + ' Skill: ' + skill + ' Damage/Healing: ' + damage +
-                                            ' HpLessen: ' + hpLessenValue +
+                                        const actionType = isHeal ? 'Healing' : 'Damage';
+                                        logger.info('User: ' + operator_uid + ' Skill: ' + skill + ' ' + actionType + ': ' + damage +
+                                            (isHeal ? '' : ' HpLessen: ' + hpLessenValue) +
                                             ' Extra: ' + extra.join('|')
                                         );
                                     }
