@@ -457,7 +457,7 @@ async function main() {
                                         if (!operator_uid) continue;
 
                                         let srcTargetStr = operator_is_player ? ('Src: ' + operator_uid) : ('SrcUUID: ' + operatorUUID);
-                                        srcTargetStr += target_is_player ? (' Target: ' + target_uid) : (' TargetUUID: ' + targetUUID);
+                                        srcTargetStr += target_is_player ? (' Tgt: ' + target_uid) : (' TgtUUID: ' + targetUUID);
                                         if (target_is_player) { //玩家目标
                                             if (isHeal) { //玩家被治疗
                                                 if (operator_is_player) { //只记录玩家造成的治疗
@@ -482,7 +482,7 @@ async function main() {
                                         if (extra.length === 0) extra = ['Normal'];
 
                                         const actionType = isHeal ? 'Healing' : 'Damage';
-                                        logger.info(srcTargetStr + ' Skill: ' + skill + ' ' + actionType + ': ' + damage +
+                                        logger.info(srcTargetStr + ' Skill/Buff: ' + skill + ' ' + actionType + ': ' + damage +
                                             (isHeal ? '' : ' HpLessen: ' + hpLessenValue) +
                                             ' Extra: ' + extra.join('|')
                                         );
