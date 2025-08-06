@@ -351,6 +351,8 @@
         let chartDatasetMap = {}; // 缓存数据集索引，避免重建
         let lastUpdateTime = 0;
         let chartInitialized = false; // 标记图表是否已初始化
+        let userColorMap = {}; // 用户固定颜色映射
+        let isUpdatingFromLegend = false; // 防止图例事件和控制面板事件相互触发
         
         // 多用户性能优化配置
         const CHART_CONFIG = {
@@ -363,6 +365,35 @@
         
         let performanceMode = false;
         let userPriorityCache = {}; // 用户优先级缓存
+        
+        // 美观的20色配色方案
+        const colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+            '#DDA0DD', '#FF9F43', '#54A0FF', '#5F27CD', '#00D2D3',
+            '#10AC84', '#EE5A24', '#0984E3', '#6C5CE7', '#FD79A8',
+            '#FDCB6E', '#E84393', '#A29BFE', '#00B894', '#00CEC9'
+        ];
+        
+        // 为用户分配固定颜色
+        function getUserColor(userId) {
+            const userIdStr = String(userId);
+            
+            if (!userColorMap[userIdStr]) {
+                // 基于用户ID的哈希值分配颜色，确保同一个用户总是得到相同的颜色
+                let hash = 0;
+                for (let i = 0; i < userIdStr.length; i++) {
+                    const char = userIdStr.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash; // 转换为32位整数
+                }
+                
+                // 使用哈希值选择颜色
+                const colorIndex = Math.abs(hash) % colors.length;
+                userColorMap[userIdStr] = colors[colorIndex];
+            }
+            
+            return userColorMap[userIdStr];
+        }
         
         // 用户优先级计算 - 基于DPS和活跃度
         function calculateUserPriority(userId, userArray) {
@@ -528,6 +559,7 @@
             dpsHistory = {};
             chartDatasetMap = {};
             userPriorityCache = {};
+            userColorMap = {}; // 清空颜色映射
             performanceMode = false;
             
             // 清空ECharts图表
@@ -756,6 +788,48 @@
             
             chart.setOption(option);
             
+            // 监听图例的选择变化事件，同步控制面板复选框状态
+            chart.on('legendselectchanged', function (params) {
+                // 防止从控制面板触发的事件再次处理
+                if (isUpdatingFromLegend) return;
+                
+                const seriesName = params.name;
+                const isSelected = params.selected[seriesName];
+                
+                // 查找对应的用户ID
+                let userId = null;
+                
+                // 检查是否是UID格式的昵称
+                const uidMatch = seriesName.match(/UID:(\d+)/);
+                if (uidMatch) {
+                    userId = uidMatch[1];
+                } else {
+                    // 查找自定义昵称对应的userId
+                    userId = Object.keys(userNicknames).find(id => userNicknames[id] === seriesName);
+                }
+                
+                if (userId) {
+                    const userIdStr = String(userId);
+                    
+                    // 同步visibleUsers状态
+                    if (isSelected) {
+                        delete visibleUsers[userIdStr];
+                    } else {
+                        visibleUsers[userIdStr] = false;
+                    }
+                    localStorage.setItem('visibleUsers', JSON.stringify(visibleUsers));
+                    
+                    // 同步控制面板复选框状态
+                    const controlElement = document.querySelector(`[data-user-id="${userIdStr}"]`);
+                    if (controlElement) {
+                        const checkbox = controlElement.querySelector('.visibility-checkbox');
+                        if (checkbox) {
+                            checkbox.checked = isSelected;
+                        }
+                    }
+                }
+            });
+            
             // 响应窗口大小变化
             window.addEventListener('resize', () => {
                 chart.resize();
@@ -776,14 +850,6 @@
             if (currentTime - lastUpdateTime < updateInterval) return;
             lastUpdateTime = currentTime;
             
-            // 美观的20色配色方案
-            const colors = [
-                '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
-                '#DDA0DD', '#FF9F43', '#54A0FF', '#5F27CD', '#00D2D3',
-                '#10AC84', '#EE5A24', '#0984E3', '#6C5CE7', '#FD79A8',
-                '#FDCB6E', '#E84393', '#A29BFE', '#00B894', '#00CEC9'
-            ];
-            
             // 获取优先显示的用户
             const priorityUsers = getTopPriorityUsers(userArray, CHART_CONFIG.MAX_VISIBLE_USERS);
             const activeUserSet = new Set(priorityUsers);
@@ -796,7 +862,7 @@
             const currentSeries = currentOption.series || [];
             
             // 生成时间轴数据 (只在初次或数据长度变化时更新)
-            if (!chartInitialized || currentOption.xAxis[0].data.length !== dataLength) {
+            if (!chartInitialized || !currentOption.xAxis || !currentOption.xAxis[0] || currentOption.xAxis[0].data.length !== dataLength) {
                 const xAxisData = [];
                 for (let i = 0; i < dataLength; i++) {
                     xAxisData.push('');
@@ -811,7 +877,7 @@
                 chartInitialized = true;
             }
             
-            // 增量更新series - 关键优化
+            // 更新series
             const updatedSeries = [];
             const existingSeriesMap = {};
             
@@ -824,7 +890,7 @@
             priorityUsers.forEach((userId, index) => {
                 const history = dpsHistory[userId];
                 const nickname = userNicknames[userId] || `UID:${userId}`;
-                const color = colors[index % colors.length];
+                const color = getUserColor(userId); // 使用固定颜色分配
                 
                 // 构建数据数组
                 const data = new Array(dataLength).fill(null);
@@ -909,16 +975,38 @@
                 }
             });
             
-            // 使用增量更新，避免完全重绘
+            // 构建图例选中状态对象
+            const legendSelected = {};
+            updatedSeries.forEach(series => {
+                const seriesName = series.name;
+                // 检查是否是UID格式的昵称
+                const uidMatch = seriesName.match(/UID:(\d+)/);
+                let userId = null;
+                
+                if (uidMatch) {
+                    userId = uidMatch[1];
+                } else {
+                    // 查找自定义昵称对应的userId
+                    userId = Object.keys(userNicknames).find(id => userNicknames[id] === seriesName);
+                }
+                
+                // 确保userId是字符串类型进行比较
+                const userIdStr = userId ? String(userId) : null;
+                
+                // 根据visibleUsers设置图例选中状态
+                legendSelected[seriesName] = !(userIdStr && visibleUsers[userIdStr] === false);
+            });
+            
+            // 使用ECharts内置的图例机制，统一处理显示/隐藏
             chart.setOption({
                 series: updatedSeries,
-                // 同时更新主题相关样式（避免深色模式切换时的闪烁）
                 legend: {
+                    selected: legendSelected,
                     textStyle: {
                         color: document.body.classList.contains('dark-mode') ? '#cbd5e1' : '#666'
                     }
                 }
-            }, false, true); // notMerge=false, lazyUpdate=true
+            }, false, true);
             
             // 更新状态显示
             updateChartStatus(priorityUsers.length, Object.keys(dpsHistory).length);
@@ -939,17 +1027,28 @@
             const existingControls = new Set(Array.from(controlsList.children).map(el => el.dataset.userId));
             
             for (const user of userArray) {
-                if (existingControls.has(String(user.id))) continue;
+                const userIdStr = String(user.id);
                 
-                const nickname = userNicknames[user.id] || `UID:${user.id}`;
-                const isVisible = visibleUsers[user.id] !== false;
+                if (existingControls.has(userIdStr)) {
+                    // 更新已存在控件的复选框状态
+                    const existingControl = controlsList.querySelector(`[data-user-id="${userIdStr}"]`);
+                    if (existingControl) {
+                        const checkbox = existingControl.querySelector('.visibility-checkbox');
+                        const isVisible = visibleUsers[userIdStr] !== false;
+                        checkbox.checked = isVisible;
+                    }
+                    continue;
+                }
+                
+                const nickname = userNicknames[userIdStr] || `UID:${user.id}`;
+                const isVisible = visibleUsers[userIdStr] !== false;
                 
                 const controlDiv = document.createElement('div');
                 controlDiv.className = 'user-controls';
-                controlDiv.dataset.userId = user.id;
+                controlDiv.dataset.userId = userIdStr;
                 controlDiv.innerHTML = `
                     <input type="checkbox" class="visibility-checkbox" ${isVisible ? 'checked' : ''} onchange="toggleUserVisibility(${user.id}, this.checked)">
-                    <input type="text" class="user-nickname-input" value="${userNicknames[user.id] || ''}" placeholder="昵称" onchange="updateNickname(${user.id}, this.value)" oninput="updateNickname(${user.id}, this.value)">
+                    <input type="text" class="user-nickname-input" value="${userNicknames[userIdStr] || ''}" placeholder="昵称" onchange="updateNickname(${user.id}, this.value)" oninput="updateNickname(${user.id}, this.value)">
                     <span class="user-uid">(UID:${user.id})</span>
                 `;
                 
@@ -969,12 +1068,35 @@
         
         // 切换用户可见性
         function toggleUserVisibility(userId, isVisible) {
+            // 确保userId是字符串类型
+            const userIdStr = String(userId);
+            
             if (isVisible) {
-                delete visibleUsers[userId];
+                delete visibleUsers[userIdStr];
             } else {
-                visibleUsers[userId] = false;
+                visibleUsers[userIdStr] = false;
             }
             localStorage.setItem('visibleUsers', JSON.stringify(visibleUsers));
+            
+            // 使用ECharts的dispatchAction来切换图例，这样与图例点击行为完全一致
+            if (chart) {
+                // 设置标志防止递归触发
+                isUpdatingFromLegend = true;
+                
+                // 找到对应的series名称
+                const nickname = userNicknames[userIdStr] || `UID:${userId}`;
+                
+                // 通过ECharts API切换图例选中状态
+                chart.dispatchAction({
+                    type: 'legendToggleSelect',
+                    name: nickname
+                });
+                
+                // 重置标志
+                setTimeout(() => {
+                    isUpdatingFromLegend = false;
+                }, 100);
+            }
         }
         
         // 全选/取消全选
@@ -982,17 +1104,55 @@
             const checkboxes = document.querySelectorAll('.visibility-checkbox');
             const allChecked = Array.from(checkboxes).every(cb => cb.checked);
             
+            // 批量更新所有用户的可见性状态
             checkboxes.forEach(cb => {
                 cb.checked = !allChecked;
                 const userId = cb.parentElement.dataset.userId;
+                
                 if (!allChecked) {
+                    // 全选：显示所有用户
                     delete visibleUsers[userId];
                 } else {
+                    // 取消全选：隐藏所有用户
                     visibleUsers[userId] = false;
                 }
             });
             
             localStorage.setItem('visibleUsers', JSON.stringify(visibleUsers));
+            
+            // 批量同步图例状态
+            if (chart) {
+                checkboxes.forEach(cb => {
+                    const userId = cb.parentElement.dataset.userId;
+                    const nickname = userNicknames[userId] || `UID:${userId}`;
+                    
+                    // 设置标志防止递归触发
+                    isUpdatingFromLegend = true;
+                    
+                    // 通过ECharts API同步图例状态
+                    if (!allChecked) {
+                        // 全选：显示图例
+                        chart.dispatchAction({
+                            type: 'legendSelect',
+                            name: nickname
+                        });
+                    } else {
+                        // 取消全选：隐藏图例
+                        chart.dispatchAction({
+                            type: 'legendUnSelect',
+                            name: nickname
+                        });
+                    }
+                });
+                
+                // 重置标志
+                setTimeout(() => {
+                    isUpdatingFromLegend = false;
+                }, 200);
+            }
+            
+            // 触发数据更新，重新渲染表格
+            fetchDataAndUpdateTables();
         }
         
         // 清空所有昵称
