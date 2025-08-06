@@ -164,6 +164,7 @@ class UserData {
             lucky: 0,
             total: 0,
         };
+        this.takenDamage = 0; // 承伤
     }
 
     /** 添加伤害记录
@@ -185,6 +186,13 @@ class UserData {
     addHealing(healing, isCrit, isLucky) {
         this.healingStats.addRecord(healing, isCrit, isLucky);
         this._updateTotalCount(isCrit, isLucky);
+    }
+
+    /** 添加承伤记录
+     * @param {number} damage - 承受的伤害值
+     * */
+    addTakenDamage(damage) {
+        this.takenDamage += damage;
     }
 
     /** 更新统一的暴击和幸运统计
@@ -232,6 +240,7 @@ class UserData {
             realtime_hps_max: this.healingStats.realtimeStats.max,
             total_hps: this.getTotalHps(),
             total_healing: { ...this.healingStats.stats },
+            taken_damage: this.takenDamage,
         };
     }
 
@@ -245,6 +254,7 @@ class UserData {
             lucky: 0,
             total: 0,
         };
+        this.takenDamage = 0;
     }
 }
 
@@ -286,6 +296,15 @@ class UserDataManager {
     addHealing(uid, healing, isCrit, isLucky) {
         const user = this.getUser(uid);
         user.addHealing(healing, isCrit, isLucky);
+    }
+
+    /** 添加承伤记录
+     * @param {number} uid - 承受伤害的用户ID
+     * @param {number} damage - 承受的伤害值
+     * */
+    addTakenDamage(uid, damage) {
+        const user = this.getUser(uid);
+        user.addTakenDamage(damage);
     }
 
     /** 更新所有用户的实时DPS和HPS */
@@ -427,19 +446,34 @@ async function main() {
                                         const skill = hit[12];
                                         if (typeof skill !== 'number') continue;
                                         const value = hit[6], luckyValue = hit[8], isMiss = !!hit[2], isCrit = !!hit[5], hpLessenValue = hit[9] ?? 0;
-                                        const targetUUID = b[1], isHeal = hit[4] === 2, isDead = !!hit[17], isLucky = !!luckyValue;
+                                        const isHeal = hit[4] === 2, isDead = !!hit[17], isLucky = !!luckyValue;
+                                        const operatorUUID = hit[11], targetUUID = b[1];
                                         const damage = value ?? luckyValue ?? 0;
                                         if (typeof damage !== 'number') continue;
-                                        const is_player = (BigInt(hit[21] || hit[11]) & 0xffffn) === 640n;
-                                        if (!is_player) continue; //排除怪物攻击
-                                        const operator_uid = Number(BigInt(hit[21] || hit[11]) >> 16n);
+                                        const operator_is_player = (BigInt(operatorUUID) & 0xffffn) === 640n;
+                                        const target_is_player = (BigInt(targetUUID) & 0xffffn) === 640n;
+                                        const operator_uid = Number(BigInt(operatorUUID) >> 16n);
+                                        const target_uid = Number(BigInt(targetUUID) >> 16n);
                                         if (!operator_uid) continue;
-                                        const overHit = damage - hpLessenValue;
 
-                                        if (isHeal) {
-                                            userDataManager.addHealing(operator_uid, damage, isCrit, isLucky);
-                                        } else {
-                                            userDataManager.addDamage(operator_uid, damage, isCrit, isLucky, hpLessenValue);
+                                        let srcTargetStr = operator_is_player ? ('Src: ' + operator_uid) : ('SrcUUID: ' + operatorUUID);
+                                        srcTargetStr += target_is_player ? (' Target: ' + target_uid) : (' TargetUUID: ' + targetUUID);
+                                        if (target_is_player) { //玩家目标
+                                            if (isHeal) { //玩家被治疗
+                                                if (operator_is_player) { //只记录玩家造成的治疗
+                                                    userDataManager.addHealing(operator_uid, damage, isCrit, isLucky);
+                                                }
+                                            } else { //玩家受到伤害
+                                                userDataManager.addTakenDamage(target_uid, damage);
+                                            }
+                                        } else { //非玩家目标
+                                            if (isHeal) { //非玩家被治疗
+                                            }
+                                            else { //非玩家受到伤害
+                                                if (operator_is_player) { //只记录玩家造成的伤害
+                                                    userDataManager.addDamage(operator_uid, damage, isCrit, isLucky, hpLessenValue);
+                                                }
+                                            }
                                         }
 
                                         let extra = [];
@@ -448,7 +482,7 @@ async function main() {
                                         if (extra.length === 0) extra = ['Normal'];
 
                                         const actionType = isHeal ? 'Healing' : 'Damage';
-                                        logger.info('User: ' + operator_uid + ' Skill: ' + skill + ' ' + actionType + ': ' + damage +
+                                        logger.info(srcTargetStr + ' Skill: ' + skill + ' ' + actionType + ': ' + damage +
                                             (isHeal ? '' : ' HpLessen: ' + hpLessenValue) +
                                             ' Extra: ' + extra.join('|')
                                         );
