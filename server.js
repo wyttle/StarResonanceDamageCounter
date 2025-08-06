@@ -212,14 +212,16 @@ async function main() {
                                     const hits = Array.isArray(b[7][2]) ? b[7][2] : [b[7][2]];
                                     for (const hit of hits) {
                                         const skill = hit[12];
-                                        if (typeof skill !== 'number') break; //可以用来区分伤害和治疗啥的，但我不想去导出它的表
+                                        if (typeof skill !== 'number') continue;
                                         const value = hit[6], luckyValue = hit[8], isMiss = hit[2], isCrit = hit[5], hpLessenValue = hit[9] ?? 0;
+                                        const target_uuid = b[1], isHeal = hit[4] === 2, isDead = !!hit[17];
                                         const damage = value ?? luckyValue;
                                         const is_player = (BigInt(hit[21] || hit[11]) & 0xffffn) === 640n;
-                                        if (!is_player) break; //排除怪物攻击
+                                        if (!is_player) continue; //排除怪物攻击
                                         const operator_uid = BigInt(hit[21] || hit[11]) >> 16n;
-                                        if (!operator_uid) break;
-                                        if (typeof damage !== 'number') break;
+                                        if (!operator_uid) continue;
+                                        if (typeof damage !== 'number') continue;
+                                        const overHit = damage - hpLessenValue;
 
                                         //初始化
                                         if (!total_damage[operator_uid]) total_damage[operator_uid] = {
@@ -273,6 +275,7 @@ async function main() {
 
                                         logger.info('User: ' + operator_uid + ' Skill: ' + skill + ' Damage/Healing: ' + damage +
                                                     ' HpLessen: ' + hpLessenValue +
+                                                    ' F4: ' + F4 +
                                                     ' Extra: ' + extra.join('|')
                                             );
                                     }
