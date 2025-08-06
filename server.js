@@ -50,11 +50,188 @@ class Lock {
     }
 }
 
-let total_damage = {};
-let total_count = {};
-let dps_window = {};
-let damage_time = {};
-let realtime_dps = {};
+class UserData {
+    constructor(uid) {
+        this.uid = uid;
+        this.totalDamage = {
+            normal: 0,
+            critical: 0,
+            lucky: 0,
+            crit_lucky: 0,
+            hpLessen: 0,
+            total: 0,
+        };
+        this.totalCount = {
+            normal: 0,
+            critical: 0,
+            lucky: 0,
+            total: 0,
+        };
+        this.dpsWindow = [];
+        this.damageTime = [];
+        this.realtimeDps = {
+            value: 0,
+            max: 0,
+        };
+    }
+
+    /** 添加伤害记录
+     * @param {number} damage - 伤害值
+     * @param {boolean} isCrit - 是否为暴击
+     * @param {number} [luckyValue] - 是否为幸运
+     * @param {number} hpLessenValue - 生命值减少量
+     */
+    addDamage(damage, isCrit, luckyValue, hpLessenValue = 0) {
+        const now = Date.now();
+
+        if (isCrit) {
+            this.totalCount.critical++;
+            if (luckyValue) {
+                this.totalDamage.crit_lucky += damage;
+                this.totalCount.lucky++;
+            } else {
+                this.totalDamage.critical += damage;
+            }
+        } else if (luckyValue) {
+            this.totalDamage.lucky += damage;
+            this.totalCount.lucky++;
+        } else {
+            this.totalDamage.normal += damage;
+            this.totalCount.normal++;
+        }
+
+        this.totalDamage.total += damage;
+        this.totalDamage.hpLessen += hpLessenValue;
+        this.totalCount.total++;
+
+        this.dpsWindow.push({
+            time: now,
+            damage,
+        });
+
+        if (this.damageTime[0]) {
+            this.damageTime[1] = now;
+        } else {
+            this.damageTime[0] = now;
+        }
+    }
+
+    /** 更新实时DPS 计算过去1秒内的总伤害 */
+    updateRealtimeDps() {
+        const now = Date.now();
+        while (this.dpsWindow.length > 0 && now - this.dpsWindow[0].time > 1000) {
+            this.dpsWindow.shift();
+        }
+        this.realtimeDps.value = 0;
+        for (const entry of this.dpsWindow) {
+            this.realtimeDps.value += entry.damage;
+        }
+        if (this.realtimeDps.value > this.realtimeDps.max) {
+            this.realtimeDps.max = this.realtimeDps.value;
+        }
+    }
+
+    /** 计算总DPS */
+    getTotalDps() {
+        if (!this.damageTime[0] || !this.damageTime[1]) {
+            return 0;
+        }
+        return (this.totalDamage.total / (this.damageTime[1] - this.damageTime[0]) * 1000) || 0;
+    }
+
+    /** 获取用户数据摘要 */
+    getSummary() {
+        return {
+            realtime_dps: this.realtimeDps.value,
+            realtime_dps_max: this.realtimeDps.max,
+            total_dps: this.getTotalDps(),
+            total_damage: { ...this.totalDamage },
+            total_count: { ...this.totalCount },
+        };
+    }
+
+    /** 重置数据 预留 */
+    reset() {
+        this.totalDamage = {
+            normal: 0,
+            critical: 0,
+            lucky: 0,
+            crit_lucky: 0,
+            hpLessen: 0,
+            total: 0,
+        };
+        this.totalCount = {
+            normal: 0,
+            critical: 0,
+            lucky: 0,
+            total: 0,
+        };
+        this.dpsWindow = [];
+        this.damageTime = [];
+        this.realtimeDps = {
+            value: 0,
+            max: 0,
+        };
+    }
+}
+
+// 用户数据管理器
+class UserDataManager {
+    constructor() {
+        this.users = new Map();
+    }
+
+    /** 获取或创建用户记录
+     * @param {number} uid - 用户ID
+     * @returns {UserData} - 用户数据实例
+     */
+    getUser(uid) {
+        if (!this.users.has(uid)) {
+            this.users.set(uid, new UserData(uid));
+        }
+        return this.users.get(uid);
+    }
+
+    /** 添加伤害记录
+     * @param {number} uid - 造成伤害的用户ID
+     * @param {number} damage - 伤害值
+     * @param {boolean} isCrit - 是否为暴击
+     * @param {number} [luckyValue] - 是否为幸运
+     * @param {number} hpLessenValue - 生命值减少量
+     */
+    addDamage(uid, damage, isCrit, luckyValue, hpLessenValue = 0) {
+        const user = this.getUser(uid);
+        user.addDamage(damage, isCrit, luckyValue, hpLessenValue);
+    }
+
+    /** 更新所有用户的实时DPS */
+    updateAllRealtimeDps() {
+        for (const user of this.users.values()) {
+            user.updateRealtimeDps();
+        }
+    }
+
+    /** 获取所有用户数据 */
+    getAllUsersData() {
+        const result = {};
+        for (const [uid, user] of this.users.entries()) {
+            result[uid] = user.getSummary();
+        }
+        return result;
+    }
+
+    /** 清除所有用户数据 */
+    clearAll() {
+        this.users.clear();
+    }
+
+    /** 获取用户列表 */
+    getUserIds() {
+        return Array.from(this.users.keys());
+    }
+}
+
+const userDataManager = new UserDataManager();
 
 async function main() {
     print('Welcome to use Damage Counter for Star Resonance by Dimole!');
@@ -87,72 +264,24 @@ async function main() {
         ]
     });
 
-    //瞬时DPS
+    //瞬时DPS更新
     setInterval(() => {
-        const now = Date.now();
-        for (const uid of Object.keys(dps_window)) {
-            while (dps_window[uid].length > 0 && now - dps_window[uid][0].time > 1000) {
-                dps_window[uid].shift();
-            }
-            if (!realtime_dps[uid]) {
-                realtime_dps[uid] = {
-                    value: 0,
-                    max: 0,
-                }
-            }
-            realtime_dps[uid].value = 0;
-            for (const b of dps_window[uid]) {
-                realtime_dps[uid].value += b.damage;
-            }
-            if (realtime_dps[uid].value > realtime_dps[uid].max) {
-                realtime_dps[uid].max = realtime_dps[uid].value;
-            }
-        }
+        userDataManager.updateAllRealtimeDps();
     }, 100);
 
     //express
     app.use(cors());
     app.use(express.static('public'));
     app.get('/api/data', (req, res) => {
-        const user = {};
-        for (const uid of Object.keys(total_damage)) {
-            if (!user[uid]) user[uid] = {
-                realtime_dps: 0,
-                realtime_dps_max: 0,
-                total_dps: 0,
-                total_damage: {
-                    normal: 0,
-                    critical: 0,
-                    lucky: 0,
-                    crit_lucky: 0,
-                    hpLessen: 0,
-                    total: 0,
-                },
-                total_count: {
-                    normal: 0,
-                    critical: 0,
-                    lucky: 0,
-                    total: 0,
-                },
-            };
-            user[uid].total_damage = total_damage[uid];
-            user[uid].total_count = total_count[uid];
-            user[uid].total_dps = ((total_damage[uid].total) / (damage_time[uid][1] - damage_time[uid][0]) * 1000) || 0;
-            user[uid].realtime_dps = realtime_dps[uid] ? realtime_dps[uid].value : 0;
-            user[uid].realtime_dps_max = realtime_dps[uid] ? realtime_dps[uid].max : 0;
-        }
+        const userData = userDataManager.getAllUsersData();
         const data = {
             code: 0,
-            user,
+            user: userData,
         };
         res.json(data);
     });
     app.get('/api/clear', (req, res) => {
-        total_damage = {};
-        total_count = {};
-        dps_window = {};
-        damage_time = {};
-        realtime_dps = {};
+        userDataManager.clearAll();
         logger.info('Statistics have been cleared!');
         res.json({
             code: 0,
@@ -213,71 +342,27 @@ async function main() {
                                     for (const hit of hits) {
                                         const skill = hit[12];
                                         if (typeof skill !== 'number') continue;
-                                        const value = hit[6], luckyValue = hit[8], isMiss = hit[2], isCrit = hit[5], hpLessenValue = hit[9] ?? 0;
-                                        const target_uuid = b[1], isHeal = hit[4] === 2, isDead = !!hit[17];
-                                        const damage = value ?? luckyValue;
+                                        const value = hit[6], luckyValue = hit[8], isMiss = !!hit[2], isCrit = !!hit[5], hpLessenValue = hit[9] ?? 0;
+                                        const targetUUID = b[1], isHeal = hit[4] === 2, isDead = !!hit[17];
+                                        const damage = value ?? luckyValue ?? 0;
+                                        if (typeof damage !== 'number') continue;
                                         const is_player = (BigInt(hit[21] || hit[11]) & 0xffffn) === 640n;
                                         if (!is_player) continue; //排除怪物攻击
-                                        const operator_uid = BigInt(hit[21] || hit[11]) >> 16n;
+                                        const operator_uid = Number(BigInt(hit[21] || hit[11]) >> 16n);
                                         if (!operator_uid) continue;
-                                        if (typeof damage !== 'number') continue;
                                         const overHit = damage - hpLessenValue;
 
-                                        //初始化
-                                        if (!total_damage[operator_uid]) total_damage[operator_uid] = {
-                                            normal: 0,
-                                            critical: 0,
-                                            lucky: 0,
-                                            crit_lucky: 0,
-                                            hpLessen: 0,
-                                            total: 0,
-                                        };
-                                        if (!total_count[operator_uid]) total_count[operator_uid] = {
-                                            normal: 0,
-                                            critical: 0,
-                                            lucky: 0,
-                                            total: 0,
-                                        };
+                                        userDataManager.addDamage(operator_uid, damage, isCrit, luckyValue, hpLessenValue);
 
-                                        if (isCrit) {
-                                            total_count[operator_uid].critical++;
-                                            if (luckyValue) {
-                                                total_damage[operator_uid].crit_lucky += damage;
-                                                total_count[operator_uid].lucky++;
-                                            } else {
-                                                total_damage[operator_uid].critical += damage;
-                                            }
-                                        } else if (luckyValue) {
-                                            total_damage[operator_uid].lucky += damage;
-                                            total_count[operator_uid].lucky++;
-                                        } else {
-                                            total_damage[operator_uid].normal += damage;
-                                            total_count[operator_uid].normal++;
-                                        }
-                                        total_damage[operator_uid].total += damage;
-                                        total_damage[operator_uid].hpLessen += hpLessenValue;
-                                        total_count[operator_uid].total++;
-                                        if (!dps_window[operator_uid]) dps_window[operator_uid] = [];
-                                        dps_window[operator_uid].push({
-                                            time: Date.now(),
-                                            damage,
-                                        });
-                                        if (!damage_time[operator_uid]) damage_time[operator_uid] = [];
-                                        if (damage_time[operator_uid][0]) {
-                                            damage_time[operator_uid][1] = Date.now();
-                                        } else {
-                                            damage_time[operator_uid][0] = Date.now();
-                                        }
                                         let extra = [];
                                         if (isCrit) extra.push('Crit');
                                         if (luckyValue) extra.push('Lucky');
                                         if (extra.length === 0) extra = ['Normal'];
 
                                         logger.info('User: ' + operator_uid + ' Skill: ' + skill + ' Damage/Healing: ' + damage +
-                                                    ' HpLessen: ' + hpLessenValue +
-                                                    ' F4: ' + F4 +
-                                                    ' Extra: ' + extra.join('|')
-                                            );
+                                            ' HpLessen: ' + hpLessenValue +
+                                            ' Extra: ' + extra.join('|')
+                                        );
                                     }
                                 } else {
                                     //logger.debug(data1.toString('hex'));
