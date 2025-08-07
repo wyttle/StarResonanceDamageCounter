@@ -240,20 +240,117 @@
             color: #aaa;
         }
 
-        .controls-panel {
-            max-width: 1200px;
-            margin: 20px auto;
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+        /* 弹窗样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease;
         }
 
-        .dark-mode .controls-panel {
-            background: #2d2d2d !important;
-            color: #e0e0e0 !important;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow: hidden;
+            animation: slideIn 0.3s ease;
+        }
+
+        .modal-header {
+            background-color: #3498db;
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: white;
+        }
+
+        .close-button {
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .close-button:hover {
+            color: #f0f0f0;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        /* 夜间模式下的弹窗样式 */
+        .dark-mode .modal-content {
+            background-color: #2d2d2d;
+            color: #e0e0e0;
+        }
+
+        .dark-mode .modal-header {
+            background-color: #1976d2;
+        }
+
+        /* 移动设备响应式设计 */
+        @media (max-width: 768px) {
+            .modal-content {
+                margin: 2% auto;
+                width: 95%;
+                max-height: 90vh;
+            }
+            
+            .modal-header {
+                padding: 15px;
+            }
+            
+            .modal-body {
+                padding: 15px;
+            }
+            
+            #userControlsList {
+                max-height: 300px;
+                gap: 8px;
+            }
+            
+            .user-controls {
+                flex-direction: column;
+                gap: 5px;
+                padding: 8px;
+            }
+            
+            .user-nickname-input {
+                width: 80px;
+            }
+        }
+
+        /* 弹窗动画 */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from { 
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to { 
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
 
         /* 简洁模式样式 */
@@ -293,15 +390,24 @@
     <button id="pauseButton" onclick="togglePause()">⏸️ 暂停统计</button>
     <button onclick="toggleDarkMode()">🌙 夜间模式</button>
     <button onclick="toggleSimpleMode()">📋 简洁模式</button>
+    <button onclick="toggleControlsModal()">⚙️ 用户设置</button>
 
-    <!-- 控制面板 -->
-    <div class="controls-panel">
-        <div style="margin-bottom: 15px;">
-            <button onclick="toggleAllUsers()">🔄 全选/取消全选</button>
-            <button onclick="clearNicknames()">🗑️ 清空所有昵称</button>
-        </div>
-        <div id="userControlsList" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
-            <!-- 用户控制项将在这里动态生成 -->
+    <!-- 控制面板弹窗 -->
+    <div id="controlsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>⚙️ 用户控制面板</span>
+                <span class="close-button" onclick="toggleControlsModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 15px; text-align: center;">
+                    <button onclick="toggleAllUsers()">🔄 全选/取消全选</button>
+                    <button onclick="clearNicknames()">🗑️ 清空所有昵称</button>
+                </div>
+                <div id="userControlsList" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-height: 400px; overflow-y: auto;">
+                    <!-- 用户控制项将在这里动态生成 -->
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1367,6 +1473,36 @@
                 });
             }
         }
+
+        // 切换控制面板弹窗显示/隐藏
+        function toggleControlsModal() {
+            const modal = document.getElementById('controlsModal');
+            const isVisible = modal.style.display === 'block';
+            
+            if (isVisible) {
+                modal.style.display = 'none';
+            } else {
+                modal.style.display = 'block';
+            }
+        }
+
+        // 点击弹窗外部区域关闭弹窗
+        window.onclick = function(event) {
+            const modal = document.getElementById('controlsModal');
+            if (event.target === modal) {
+                toggleControlsModal();
+            }
+        }
+
+        // 键盘ESC键关闭弹窗
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const modal = document.getElementById('controlsModal');
+                if (modal.style.display === 'block') {
+                    toggleControlsModal();
+                }
+            }
+        });
 
         // 初始化
         function initialize() {
