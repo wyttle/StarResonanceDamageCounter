@@ -196,7 +196,7 @@ class PacketProcessor {
 
             if (isAttackerPlayer) {
                 const roleName = getRoleIdFromSkillId(skillId);
-                if (roleName) userDataManager.setProfession(attackerUuid.toNumber(), roleName);
+                if (roleName) this.userDataManager.setProfession(attackerUuid.toNumber(), roleName);
             }
 
             let extra = [];
