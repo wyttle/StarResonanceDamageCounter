@@ -231,7 +231,7 @@ class PacketProcessor {
         const uuid = aoiSyncToMeDelta.Uuid;
         if (uuid && !currentUserUuid.eq(uuid)) {
             currentUserUuid = uuid;
-            this.logger.info("Got player UUID! UUID: " + currentUserUuid);
+            this.logger.info("Got player UUID! UUID: " + currentUserUuid + " UID: " + currentUserUuid.shiftRight(16));
         }
 
         const aoiSyncDelta = aoiSyncToMeDelta.BaseDelta;
