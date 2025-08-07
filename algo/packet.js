@@ -136,9 +136,10 @@ class PacketProcessor {
     _processAoiSyncDelta(aoiSyncDelta) {
         if (!aoiSyncDelta) return;
 
-        const targetUuid = aoiSyncDelta.Uuid;
+        let targetUuid = aoiSyncDelta.Uuid;
         if (!targetUuid) return;
         const isTargetPlayer = isUuidPlayer(targetUuid);
+        targetUuid = targetUuid.shiftRight(16);
 
         const skillEffect = aoiSyncDelta.SkillEffects;
         if (!skillEffect) return;
@@ -148,9 +149,10 @@ class PacketProcessor {
             const skillId = syncDamageInfo.OwnerId;
             if (!skillId) continue;
 
-            const attackerUuid = syncDamageInfo.TopSummonerId || syncDamageInfo.AttackerUuid;
+            let attackerUuid = syncDamageInfo.TopSummonerId || syncDamageInfo.AttackerUuid;
             if (!attackerUuid) continue;
             const isAttackerPlayer = isUuidPlayer(attackerUuid);
+            attackerUuid = attackerUuid.shiftRight(16);
 
             const value = syncDamageInfo.Value;
             const luckyValue = syncDamageInfo.LuckyValue;
@@ -205,7 +207,7 @@ class PacketProcessor {
             if (extra.length === 0) extra = ["Normal"];
 
             const actionType = isHeal ? "Healing" : "Damage";
-            const infoStr = `Src ${isAttackerPlayer ? "(player)" : ""}: ${attackerUuid} Tgt ${isTargetPlayer ? "(player)" : ""}: ${targetUuid}`;
+            const infoStr = `Src${isAttackerPlayer ? " (player)" : ""}: ${attackerUuid} Tgt${isTargetPlayer ? " (player)" : ""}: ${targetUuid}`;
             this.logger.info(`${infoStr} Skill/Buff: ${skillId} ${actionType}: ${damage} ${isHeal ? "" : ` HpLessen: ${hpLessenValue}`} Extra: ${extra.join("|")}`);
         }
     }
