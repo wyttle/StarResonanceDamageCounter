@@ -4,6 +4,8 @@ const readline = require('readline');
 const winston = require("winston");
 const net = require('net');
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const PacketProcessor = require('./algo/packet');
 const pb = require('./algo/pb');
 const Readable = require("stream").Readable;
@@ -370,6 +372,9 @@ class UserDataManager {
 
 const userDataManager = new UserDataManager();
 
+// 暂停统计状态
+let isPaused = false;
+
 async function main() {
     print('Welcome to use Damage Counter for Star Resonance!');
     print('Version: V2.2.1');
@@ -395,6 +400,7 @@ async function main() {
             print('Cannot find device ' + num + '!');
             process.exit(1);
         }
+
     }
     if (log_level === undefined || !isValidLogLevel(log_level)) {
         log_level = await ask('Please enter log level (info|debug): ') || 'info';
@@ -421,12 +427,23 @@ async function main() {
 
     //瞬时DPS更新
     setInterval(() => {
-        userDataManager.updateAllRealtimeDps();
+        if (!isPaused) {
+            userDataManager.updateAllRealtimeDps();
+        }
     }, 100);
 
-    //express
+    //express 和 socket.io 设置
     app.use(cors());
+    app.use(express.json()); // 解析JSON请求体
     app.use(express.static('public'));
+    const server = http.createServer(app);
+    const io = new Server(server, {
+        cors: {
+            origin: "*",
+            methods: ["GET", "POST"]
+        }
+    });
+
     app.get('/api/data', (req, res) => {
         const userData = userDataManager.getAllUsersData();
         const data = {
@@ -443,8 +460,51 @@ async function main() {
             msg: 'Statistics have been cleared!',
         });
     });
-    app.listen(8989, () => {
+
+    // 暂停/开始统计API
+    app.post('/api/pause', (req, res) => {
+        const { paused } = req.body;
+        isPaused = paused;
+        logger.info(`Statistics ${isPaused ? 'paused' : 'resumed'}!`);
+        res.json({
+            code: 0,
+            msg: `Statistics ${isPaused ? 'paused' : 'resumed'}!`,
+            paused: isPaused
+        });
+    });
+
+    // 获取暂停状态API
+    app.get('/api/pause', (req, res) => {
+        res.json({
+            code: 0,
+            paused: isPaused
+        });
+    });
+
+    // WebSocket 连接处理
+    io.on('connection', (socket) => {
+        logger.info('WebSocket client connected: ' + socket.id);
+        
+        socket.on('disconnect', () => {
+            logger.info('WebSocket client disconnected: ' + socket.id);
+        });
+    });
+
+    // 每50ms广播数据给所有WebSocket客户端
+    setInterval(() => {
+        if (!isPaused) {
+            const userData = userDataManager.getAllUsersData();
+            const data = {
+                code: 0,
+                user: userData,
+            };
+            io.emit('data', data);
+        }
+    }, 50);
+
+    server.listen(8989, () => {
         logger.info('Web Server started at http://localhost:8989');
+        logger.info('WebSocket Server started');
     });
 
     logger.info('Welcome!');
@@ -567,7 +627,7 @@ async function main() {
                             const packet = _data.subarray(0, packetSize);
                             _data = _data.subarray(packetSize);
                             const processor = new PacketProcessor({ logger, userDataManager });
-                            processor.processPacket(packet);
+                            if (!isPaused) processor.processPacket(packet);
                         } else if (packetSize > 999999) {
                             logger.error(`Invalid Length!! ${_data.length},${len},${_data.toString('hex')},${tcp_next_seq}`);
                             process.exit(1);

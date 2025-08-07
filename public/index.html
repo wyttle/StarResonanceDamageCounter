@@ -5,10 +5,16 @@
     <meta charset="UTF-8" />
     <title>星痕共鸣实时战斗数据</title>
     <script src="./echarts.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <style>
         body {
             font-family: "Segoe UI", sans-serif;
             background-color: #f8f9fa;
+            background-image: url('./background.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
             margin: 0;
             padding: 20px;
             text-align: center;
@@ -102,6 +108,11 @@
         /* 夜间模式样式 */
         .dark-mode {
             background-color: #1a1a1a !important;
+            background-image: url('./background.png') !important;
+            background-size: cover !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+            background-attachment: fixed !important;
             color: #e0e0e0 !important;
         }
 
@@ -279,6 +290,7 @@
         </select>
     </div>
     <button onclick="clearData()">✨ 清空统计数据</button>
+    <button id="pauseButton" onclick="togglePause()">⏸️ 暂停统计</button>
     <button onclick="toggleDarkMode()">🌙 夜间模式</button>
     <button onclick="toggleSimpleMode()">📋 简洁模式</button>
 
@@ -365,6 +377,17 @@
         let userColorMap = {}; // 用户固定颜色映射
         let isUpdatingFromLegend = false; // 防止图例事件和控制面板事件相互触发
         
+        // WebSocket连接相关变量
+        let socket = null;
+        let isWebSocketConnected = false;
+        let lastWebSocketMessage = Date.now();
+        let webSocketReconnectAttempts = 0;
+        let fallbackToAPI = false;
+        let apiInterval = null;
+        
+        // 暂停统计相关变量
+        let isPaused = false;
+        
         // 多用户性能优化配置
         const CHART_CONFIG = {
             MAX_VISIBLE_USERS: 20, // 最多同时显示的用户数
@@ -441,10 +464,86 @@
                 .slice(0, maxCount);
         }
 
-        async function fetchDataAndUpdateTables() {
+        // WebSocket连接初始化
+        function initWebSocket() {
             try {
-                const res = await fetch('/api/data');
-                const data = await res.json();
+                socket = io();
+                
+                socket.on('connect', () => {
+                    console.log('WebSocket连接成功');
+                    isWebSocketConnected = true;
+                    lastWebSocketMessage = Date.now();
+                    webSocketReconnectAttempts = 0;
+                    
+                    // 如果之前启用了API备用，现在切换回WebSocket
+                    if (fallbackToAPI) {
+                        console.log('WebSocket重连成功，从API模式切换回WebSocket模式');
+                        fallbackToAPI = false;
+                        stopAPIFallback();
+                    }
+                });
+                
+                socket.on('disconnect', () => {
+                    console.log('WebSocket连接断开');
+                    isWebSocketConnected = false;
+                    webSocketReconnectAttempts++;
+                });
+                
+                socket.on('data', (data) => {
+                    lastWebSocketMessage = Date.now();
+                    // 暂停时不处理数据更新
+                    if (!isPaused) {
+                        processDataUpdate(data);
+                    }
+                });
+                
+                socket.on('connect_error', (error) => {
+                    console.error('WebSocket连接错误:', error);
+                    isWebSocketConnected = false;
+                });
+                
+            } catch (error) {
+                console.error('WebSocket初始化失败:', error);
+                startAPIFallback();
+            }
+        }
+        
+        // 监控WebSocket连接状态，5秒无消息则切换到API
+        function monitorWebSocketConnection() {
+            setInterval(() => {
+                // 暂停时不进行连接监控
+                if (isPaused) return;
+                
+                const timeSinceLastMessage = Date.now() - lastWebSocketMessage;
+                
+                if (timeSinceLastMessage > 5000 && !fallbackToAPI) {
+                    console.warn('WebSocket超过5秒无消息，切换到API轮询模式');
+                    fallbackToAPI = true;
+                    startAPIFallback();
+                }
+            }, 5000); // 每5秒检查一次
+        }
+        
+        // 启动API备用模式
+        function startAPIFallback() {
+            if (apiInterval) return; // 避免重复启动
+            
+            console.log('启动API轮询备用模式');
+            apiInterval = setInterval(fetchDataAndUpdateTables, 100);
+        }
+        
+        // 停止API备用模式
+        function stopAPIFallback() {
+            if (apiInterval) {
+                clearInterval(apiInterval);
+                apiInterval = null;
+                console.log('停止API轮询备用模式');
+            }
+        }
+        
+        // 处理数据更新（WebSocket和API通用）
+        function processDataUpdate(data) {
+            try {
                 const damageTable = document.getElementById('damageTable').querySelector('tbody');
                 damageTable.innerHTML = '';
                 
@@ -530,6 +629,19 @@
                 
                 // 更新图表
                 updateChart(userArray);
+            } catch (err) {
+                console.error('处理数据更新失败：', err);
+            }
+        }
+
+        async function fetchDataAndUpdateTables() {
+            // 暂停时不获取数据
+            if (isPaused) return;
+            
+            try {
+                const res = await fetch('/api/data');
+                const data = await res.json();
+                processDataUpdate(data);
             } catch (err) {
                 console.error('获取数据失败：', err);
             }
@@ -630,6 +742,40 @@
             }
         }
 
+        // 切换暂停/开始统计
+        function togglePause() {
+            isPaused = !isPaused;
+            const button = document.getElementById('pauseButton');
+            
+            if (isPaused) {
+                button.textContent = '▶️ 开始统计';
+                console.log('统计已暂停');
+                // 暂停时停止API轮询
+                stopAPIFallback();
+            } else {
+                button.textContent = '⏸️ 暂停统计';
+                console.log('统计已开始');
+                // 重新开始时，如果是API模式则重新启动
+                if (fallbackToAPI) {
+                    startAPIFallback();
+                }
+            }
+            
+            // 保存暂停状态到本地存储
+            localStorage.setItem('isPaused', isPaused.toString());
+            
+            // 通知服务器暂停/开始状态
+            fetch('/api/pause', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ paused: isPaused })
+            }).catch(err => {
+                console.error('设置暂停状态失败：', err);
+            });
+        }
+
         // 页面加载时检查本地存储的主题偏好和排序偏好
         function initTheme() {
             const isDarkMode = localStorage.getItem('darkMode') === 'true';
@@ -658,6 +804,29 @@
             if (savedSortMode) {
                 currentSortMode = savedSortMode;
                 document.getElementById('sortSelect').value = savedSortMode;
+            }
+        }
+
+        // 初始化暂停状态 - 优先从服务器获取状态
+        async function initPauseState() {
+            try {
+                // 从服务器获取当前暂停状态
+                const response = await fetch('/api/pause');
+                const data = await response.json();
+                isPaused = data.paused;
+            } catch (error) {
+                // 如果服务器获取失败，从本地存储获取
+                console.warn('获取服务器暂停状态失败，使用本地存储状态');
+                const savedPauseState = localStorage.getItem('isPaused');
+                isPaused = savedPauseState === 'true';
+            }
+            
+            // 更新按钮状态
+            const button = document.getElementById('pauseButton');
+            if (isPaused) {
+                button.textContent = '▶️ 开始统计';
+            } else {
+                button.textContent = '⏸️ 暂停统计';
             }
         }
 
@@ -1196,9 +1365,16 @@
             initTheme();
             initSimpleMode();
             initSortMode();
+            initPauseState();
             initChart();
             
-            setInterval(fetchDataAndUpdateTables, 100);
+            // 初始化WebSocket连接
+            initWebSocket();
+            
+            // 启动WebSocket连接监控
+            monitorWebSocketConnection();
+            
+            // 只在初始化时获取一次数据，后续通过WebSocket接收
             fetchDataAndUpdateTables();
         }
         
