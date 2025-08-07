@@ -1,6 +1,7 @@
 const zlib = require("zlib");
 const pb = require("./blueprotobuf");
 const Long = require("long");
+const pbjs = require("protobufjs/minimal");
 
 class BinaryReader {
     constructor(buffer, offset = 0) {
@@ -70,44 +71,55 @@ const MessageType = {
 };
 
 const NotifyMethod = {
+    SyncNearEntities: 0x00000006,
     SyncNearDeltaInfo: 0x0000002d,
     SyncToMeDeltaInfo: 0x0000002e,
 };
 
-const getRoleIdFromSkillId = (skillId) => {
-    // TODO: add skill table id
-    switch (skillId) {
-        case 1241:
-            return "射线";
-        case 55302:
-            return "协奏";
-        case 20301:
-            return "愈合";
-        case 1518:
-            return "惩戒";
-        case 2306:
-            return "狂音";
-        case 120902:
-            return "冰矛";
-        case 1714:
-            return "居合";
-        case 44701:
-            return "月刃";
-        case 220112:
-        case 2203622:
-            return "鹰弓";
-        case 1700827:
-            return "狼弓";
-        case 1419:
-            return "空枪";
-        case 1418:
-            return "重装";
-        case 2405:
-            return "防盾";
-        case 2406:
-            return "光盾";
-        case 199902:
-            return "岩盾";
+const AttrType = {
+    AttrName: 0x01,
+    AttrProfessionId: 0xdc,
+    AttrFightPoint: 0x272e,
+};
+
+const ProfessionType = {
+    雷影剑士: 1,
+    冰魔导师: 2,
+    涤罪恶火·战斧: 3,
+    青岚骑士: 4,
+    森语者: 5,
+    雷霆一闪·手炮: 8,
+    巨刃守护者: 9,
+    暗灵祈舞·仪刀·仪仗: 10,
+    神射手: 11,
+    神盾骑士: 12,
+    灵魂乐手: 13,
+};
+
+const getProfessionNameFromId = (professionId) => {
+    switch (professionId) {
+        case ProfessionType.雷影剑士:
+            return "雷影剑士";
+        case ProfessionType.冰魔导师:
+            return "冰魔导师";
+        case ProfessionType.涤罪恶火·战斧:
+            return "涤罪恶火·战斧";
+        case ProfessionType.青岚骑士:
+            return "青岚骑士";
+        case ProfessionType.森语者:
+            return "森语者";
+        case ProfessionType.雷霆一闪·手炮:
+            return "雷霆一闪·手炮";
+        case ProfessionType.巨刃守护者:
+            return "巨刃守护者";
+        case ProfessionType.暗灵祈舞·仪刀·仪仗:
+            return "暗灵祈舞·仪刀/仪仗";
+        case ProfessionType.神射手:
+            return "神射手";
+        case ProfessionType.神盾骑士:
+            return "神盾骑士";
+        case ProfessionType.灵魂乐手:
+            return "灵魂乐手";
         default:
             return "";
     }
@@ -196,18 +208,34 @@ class PacketProcessor {
                 }
             }
 
-            if (isAttackerPlayer) {
-                const roleName = getRoleIdFromSkillId(skillId);
-                if (roleName) this.userDataManager.setProfession(attackerUuid.toNumber(), roleName);
-            }
-
             let extra = [];
             if (isCrit) extra.push("Crit");
             if (isLucky) extra.push("Lucky");
             if (extra.length === 0) extra = ["Normal"];
 
             const actionType = isHeal ? "Healing" : "Damage";
-            const infoStr = `Src${isAttackerPlayer ? " (player)" : ""}: ${attackerUuid} Tgt${isTargetPlayer ? " (player)" : ""}: ${targetUuid}`;
+
+            let infoStr = `Src: ${attackerUuid.toString()}`;
+            if (isAttackerPlayer) {
+                const attacker = this.userDataManager.getUser(attackerUuid.toNumber());
+                if (attacker.name) {
+                    infoStr = `Src: ${attacker.name}`;
+                } else {
+                    infoStr += " (player)";
+                }
+            }
+
+            let targetName = `${targetUuid.toString()}`;
+            if (isTargetPlayer) {
+                const target = this.userDataManager.getUser(targetUuid.toNumber());
+                if (target.name) {
+                    targetName = target.name;
+                } else {
+                    targetName += " (player)"
+                }
+            }
+            infoStr += ` Tgt: ${targetName}`;
+
             this.logger.info(`${infoStr} Skill/Buff: ${skillId} ${actionType}: ${damage} ${isHeal ? "" : ` HpLessen: ${hpLessenValue}`} Extra: ${extra.join("|")}`);
         }
     }
@@ -240,6 +268,51 @@ class PacketProcessor {
         this._processAoiSyncDelta(aoiSyncDelta);
     }
 
+    _processSyncNearEntities(payloadBuffer) {
+        const syncNearEntities = pb.SyncNearEntities.decode(payloadBuffer);
+        // this.logger.debug(JSON.stringify(syncNearEntities, null, 2));
+
+        if (!syncNearEntities.Appear) return;
+        for (const entity of syncNearEntities.Appear) {
+            if (entity.EntType !== pb.EEntityType.EntChar) continue;
+
+            let playerUuid = entity.Uuid;
+            if (!playerUuid) continue;
+            playerUuid = playerUuid.shiftRight(16);
+
+            const attrCollection = entity.Attrs;
+            if (!attrCollection) continue;
+
+            if (!attrCollection.Attrs) continue;
+            for (const attr of attrCollection.Attrs) {
+                if (!attr.Id || !attr.RawData) continue;
+                const reader = pbjs.Reader.create(attr.RawData);
+
+                switch (attr.Id) {
+                    case AttrType.AttrName:
+                        const playerName = reader.string();
+                        this.userDataManager.setName(playerUuid.toNumber(), playerName);
+                        this.logger.info(`Found player name ${playerName} for uuid ${playerUuid}`);
+                        break;
+                    case AttrType.AttrProfessionId:
+                        const professionId = reader.int32();
+                        const professionName = getProfessionNameFromId(professionId);
+                        this.userDataManager.setProfession(playerUuid.toNumber(), professionName);
+                        this.logger.debug(`Found profession ${professionName} for uuid ${playerUuid}`);
+                        break;
+                    case AttrType.AttrFightPoint:
+                        const playerFightPoint = reader.int32();
+                        this.userDataManager.setFightPoint(playerUuid.toNumber(), playerFightPoint);
+                        this.logger.debug(`Found player fight point ${playerFightPoint} for uuid ${playerUuid}`);
+                        break;
+                    default:
+                        // this.logger.debug(`Found unknown attrId ${attr.Id}`);
+                        break;
+                }
+            }
+        }
+    }
+
     _processNotifyMsg(reader, isZstdCompressed) {
         const serviceUuid = reader.readUInt64();
         const stubId = reader.readUInt32();
@@ -256,6 +329,9 @@ class PacketProcessor {
         }
 
         switch (methodId) {
+            case NotifyMethod.SyncNearEntities:
+                this._processSyncNearEntities(msgPayload);
+                break;
             case NotifyMethod.SyncToMeDeltaInfo:
                 this._processSyncToMeDeltaInfo(msgPayload);
                 break;
@@ -307,7 +383,7 @@ class PacketProcessor {
                             nestedPacket = this._decompressPayload(nestedPacket);
                         }
 
-                        this.logger.debug("Processing FrameDown packet.");
+                        // this.logger.debug("Processing FrameDown packet.");
                         this.processPacket(nestedPacket);
                         break;
                     default:
