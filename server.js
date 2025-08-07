@@ -184,11 +184,13 @@ class StatisticData {
 class UserData {
     constructor(uid) {
         this.uid = uid;
+        this.name = '';
         this.damageStats = new StatisticData();
         this.healingStats = new StatisticData();
         this.takenDamage = 0; // 承伤
         this.profession = '未知';
         this.skillUsage = new Map(); // 技能使用情况
+        this.fightPoint = 0; // 总评分
     }
 
     /** 添加伤害记录
@@ -271,7 +273,23 @@ class UserData {
             total_healing: { ...this.healingStats.stats },
             taken_damage: this.takenDamage,
             profession: this.profession,
+            name: this.name,
+            fightPoint: this.fightPoint,
         };
+    }
+
+    /** 设置姓名
+     * @param {string} name - 姓名
+     * */
+    setName(name) {
+        this.name = name;
+    }
+
+    /** 设置用户总评分
+     * @param {number} fightPoint - 总评分
+     */
+    setFightPoint(fightPoint) {
+        this.fightPoint = fightPoint;
     }
 
     /** 重置数据 预留 */
@@ -281,6 +299,7 @@ class UserData {
         this.takenDamage = 0;
         this.profession = '未知';
         this.skillUsage.clear();
+        this.fightPoint = 0;
     }
 }
 
@@ -341,6 +360,24 @@ class UserDataManager {
     setProfession(uid, profession) {
         const user = this.getUser(uid);
         user.setProfession(profession);
+    }
+
+    /** 设置用户姓名
+     * @param {number} uid - 用户ID
+     * @param {string} name - 姓名
+     * */
+    setName(uid, name) {
+        const user = this.getUser(uid);
+        user.setName(name);
+    }
+
+    /** 设置用户总评分
+     * @param {number} uid - 用户ID
+     * @param {number} fightPoint - 总评分
+     */
+    setFightPoint(uid, fightPoint) {
+        const user = this.getUser(uid);
+        user.setFightPoint(fightPoint);
     }
 
     /** 更新所有用户的实时DPS和HPS */
