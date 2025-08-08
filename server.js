@@ -6,6 +6,7 @@ const net = require('net');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const fs = require('fs');
 const PacketProcessor = require('./algo/packet');
 const pb = require('./algo/pb');
 const Readable = require("stream").Readable;
@@ -307,6 +308,33 @@ class UserData {
 class UserDataManager {
     constructor() {
         this.users = new Map();
+        this.userCache = new Map(); // 用户名字和职业缓存
+        this.cacheFilePath = './users.json';
+        this.loadUserCache();
+    }
+
+    /** 加载用户缓存 */
+    loadUserCache() {
+        try {
+            if (fs.existsSync(this.cacheFilePath)) {
+                const data = fs.readFileSync(this.cacheFilePath, 'utf8');
+                const cacheData = JSON.parse(data);
+                this.userCache = new Map(Object.entries(cacheData));
+                console.log(`Loaded ${this.userCache.size} user cache entries`);
+            }
+        } catch (error) {
+            console.error('Failed to load user cache:', error);
+        }
+    }
+
+    /** 保存用户缓存 */
+    saveUserCache() {
+        try {
+            const cacheData = Object.fromEntries(this.userCache);
+            fs.writeFileSync(this.cacheFilePath, JSON.stringify(cacheData, null, 2), 'utf8');
+        } catch (error) {
+            console.error('Failed to save user cache:', error);
+        }
     }
 
     /** 获取或创建用户记录
@@ -315,7 +343,20 @@ class UserDataManager {
      */
     getUser(uid) {
         if (!this.users.has(uid)) {
-            this.users.set(uid, new UserData(uid));
+            const user = new UserData(uid);
+            
+            // 从缓存中设置名字和职业
+            const cachedData = this.userCache.get(String(uid));
+            if (cachedData) {
+                if (cachedData.name) {
+                    user.setName(cachedData.name);
+                }
+                if (cachedData.profession) {
+                    user.setProfession(cachedData.profession);
+                }
+            }
+            
+            this.users.set(uid, user);
         }
         return this.users.get(uid);
     }
@@ -360,6 +401,14 @@ class UserDataManager {
     setProfession(uid, profession) {
         const user = this.getUser(uid);
         user.setProfession(profession);
+        
+        // 更新缓存
+        const uidStr = String(uid);
+        if (!this.userCache.has(uidStr)) {
+            this.userCache.set(uidStr, {});
+        }
+        this.userCache.get(uidStr).profession = profession;
+        this.saveUserCache();
     }
 
     /** 设置用户姓名
@@ -369,6 +418,14 @@ class UserDataManager {
     setName(uid, name) {
         const user = this.getUser(uid);
         user.setName(name);
+        
+        // 更新缓存
+        const uidStr = String(uid);
+        if (!this.userCache.has(uidStr)) {
+            this.userCache.set(uidStr, {});
+        }
+        this.userCache.get(uidStr).name = name;
+        this.saveUserCache();
     }
 
     /** 设置用户总评分
