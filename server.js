@@ -553,6 +553,7 @@ async function main() {
     let tcp_cache = {};
     let tcp_cache_size = 0;
     let tcp_last_time = 0;
+    let tcp_used_seq = [];
     const tcp_lock = new Lock();
 
     const clearTcpCache = () => {
@@ -598,6 +599,7 @@ async function main() {
                         clearTcpCache();
                     }
 
+                    await tcp_lock.acquire();
                     if (current_server !== src_server) {
                         try {
                             //尝试通过小包识别服务器
@@ -613,10 +615,10 @@ async function main() {
                                         const signature = Buffer.from([0x00, 0x63, 0x33, 0x53, 0x42, 0x00]); //c3SB??
                                         if (Buffer.compare(data1.subarray(5, 5 + signature.length), signature)) break;
                                         try {
-                                            let body = pb.decode(data1.subarray(18)) || {};
                                             if (current_server !== src_server) {
                                                 current_server = src_server;
                                                 clearTcpCache();
+                                                tcp_next_seq = ret.info.seqno + buf.length;
                                                 logger.info('Got Scene Server Address: ' + src_server);
                                             }
                                         } catch (e) { }
@@ -638,17 +640,21 @@ async function main() {
                                     if (current_server !== src_server) {
                                         current_server = src_server;
                                         clearTcpCache();
+                                        tcp_next_seq = ret.info.seqno + buf.length;
                                         logger.info('Got Scene Server Address by Login Return Packet: ' + src_server);
                                     }
                                 }
                             }
                         } catch (e) { }
+                        tcp_lock.release();
                         return;
                     }
                     //这里已经是识别到的服务器的包了
-                    await tcp_lock.acquire();
-                    if (tcp_next_seq === -1 && buf.length > 4 && buf.readUInt32BE() < 0x0fffff) { //第一次抓包可能抓到后半段的，先丢了
-                        tcp_next_seq = ret.info.seqno;
+                    if (tcp_next_seq === -1) {
+                        logger.error('Unexpected TCP capture error! tcp_next_seq is -1');
+                        if (buf.length > 4 && buf.readUInt32BE() < 0x0fffff) {
+                            tcp_next_seq = ret.info.seqno;
+                        }
                     }
                     // logger.debug('TCP next seq: ' + tcp_next_seq);
                     tcp_cache[ret.info.seqno] = buf;
@@ -657,22 +663,14 @@ async function main() {
                         const seq = tcp_next_seq;
                         _data = _data.length === 0 ? tcp_cache[seq] : Buffer.concat([_data, tcp_cache[seq]]);
                         tcp_next_seq = (seq + tcp_cache[seq].length) >>> 0; //uint32
-                        tcp_cache[seq] = undefined;
+                        delete tcp_cache[seq];
                         tcp_cache_size--;
                         tcp_last_time = Date.now();
-                        setTimeout(() => {
-                            if (tcp_cache[seq]) {
-                                tcp_cache[seq] = undefined;
-                                tcp_cache_size--;
-                            }
-                        }, 10000);
+                        tcp_used_seq.push({
+                            seq: seq,
+                            time: tcp_last_time,
+                        });
                     }
-                    /*
-                    if (tcp_cache_size > 30) {
-                        logger.warn('Too much unused tcp cache! Is the game reconnected? seq: ' + tcp_next_seq + ' size:' + tcp_cache_size);
-                        clearTcpCache();
-                    }
-                    */
 
                     while (_data.length > 4) {
                         let packetSize = _data.readUInt32BE();
@@ -697,6 +695,22 @@ async function main() {
                 logger.error('Unsupported Ethertype: ' + PROTOCOL.ETHERNET[ret.info.type]);
         }
     })
+
+    //定时清理TCP缓存，删掉意外重传的数据包
+    setInterval(async () => {
+        const now = Date.now();
+        await tcp_lock.acquire();
+        tcp_used_seq = tcp_used_seq.filter(item => {
+            if (now - item.time > 10000) {
+                if (!tcp_cache[item.seq]) return false;
+                delete tcp_cache[item.seq];
+                tcp_cache_size--;
+                return false;
+            }
+            return true;
+        });
+        tcp_lock.release();
+    }, 10000);
 }
 
 main();
