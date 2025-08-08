@@ -8,6 +8,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const PacketProcessor = require('./algo/packet');
 const pb = require('./algo/pb');
+const { log } = require('console');
 const Readable = require("stream").Readable;
 const Cap = cap.Cap;
 const decoders = cap.decoders;
@@ -412,14 +413,75 @@ const userDataManager = new UserDataManager();
 // 暂停统计状态
 let isPaused = false;
 
+
+const { execSync } = require('child_process');
+const os = require('os');
+
+async function getStarExeDeviceName(devices) {
+    try {
+        // 获取Star.exe的PID
+        const tasklist = execSync('tasklist /fi "imagename eq Star.exe" /fo csv', { encoding: 'utf8' });
+        const pidMatch = tasklist.match(/"Star.exe","(\d+)"/);
+        if (!pidMatch) return -1;
+        
+        const pid = pidMatch[1];
+        print('找到游戏Pid:' + pid);
+        
+        // 获取该PID的网络连接
+        const netstat = execSync(`netstat -ano | findstr ${pid}`, { encoding: 'utf8' }).trim();
+        if (!netstat) return -1;
+
+        // 提取本地IP地址
+        const localIPs = new Set();
+        netstat.split('\n').forEach(line => {
+            const parts = line.trim().split(/\s+/);
+            if (parts[1] && parts[1] !== '0.0.0.0:0') {
+                const ip = parts[1].split(':')[0];
+                if (ip !== '127.0.0.1' && ip !== '0.0.0.0') {
+                    localIPs.add(ip);
+                }
+            }
+        });
+
+        if (localIPs.size === 0) return -1;
+        
+        // 获取使用的IP地址对应的MAC地址
+        const interfaces = os.networkInterfaces();
+        let targetMac = null;
+        
+        for (const name of Object.keys(interfaces)) {
+            const iface = interfaces[name].find(addr => 
+                addr.family === 'IPv4' && localIPs.has(addr.address)
+            );
+            if (iface) {
+                targetMac = iface.mac.toLowerCase().replace(/[:-]/g, '');
+                break;
+            }
+        }
+        
+        if (!targetMac) return -1;
+        
+        // 获取所有网卡的MAC地址映射
+        const getmacOutput = execSync('getmac /fo csv /v', { encoding: 'utf8' });
+        
+        for (const line of getmacOutput.split('\n')) {
+            const device = line.split(',');
+            if (!device[2]) continue;
+            const mac = device[2].replace(/-/g, '').replace(/"/g, '').toLowerCase();
+            if (mac === targetMac) {
+                return device[1].replace(/"/g, '');
+            }
+        }
+        return -1;
+    } catch {
+        return -1;
+    }
+}
+
 async function main() {
     print('Welcome to use Damage Counter for Star Resonance!');
     print('Version: V2.2.2');
     print('GitHub: https://github.com/dmlgzs/StarResonanceDamageCounter');
-    for (let i = 0; i < devices.length; i++) {
-        print(i + '.\t' + devices[i].description);
-    }
-
     // 从命令行参数获取设备号和日志级别
     const args = process.argv.slice(2);
     let num = args[0];
@@ -432,21 +494,33 @@ async function main() {
 
     // 如果命令行没传或者不合法，使用交互
     if (num === undefined || !devices[num]) {
-        num = await ask('Please enter the number of the device used for packet capture: ');
-        if (!devices[num]) {
-            print('Cannot find device ' + num + '!');
-            process.exit(1);
+        num = -1;
+        let detectDevice = await getStarExeDeviceName(devices)
+        print(detectDevice)
+        let detectNum = -1
+        for (let i = 0; i < devices.length; i++) {
+            print(i + '.\t' + devices[i].description);
+            if(detectDevice == devices[i].description){
+                detectNum = i
+            }
         }
-
+        // 若找不到合适设备，则手动选择
+        if (detectNum === -1) {
+            print("无法自动找到游戏使用的网卡,请手动选择!")
+            num = await ask('Please enter the number of the device used for packet capture: ');
+            if (!devices[num]) {
+                print('Cannot find device ' + num + '!');
+                process.exit(1);
+            }
+        }else{
+            num = detectNum;
+            print('已自动选择网卡'+num+'!')
+        }
     }
     if (log_level === undefined || !isValidLogLevel(log_level)) {
-        log_level = await ask('Please enter log level (info|debug): ') || 'info';
-        if (!isValidLogLevel(log_level)) {
-            print('Invalid log level!');
-            process.exit(1);
-        }
+        log_level='info'
+        print('已自动选择日志模式为info!')
     }
-
     rl.close();
     const logger = winston.createLogger({
         level: log_level,
