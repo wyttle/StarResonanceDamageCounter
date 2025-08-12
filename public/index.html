@@ -33,7 +33,6 @@
         }
 
         button {
-            margin: 20px 0;
             padding: 10px 20px;
             font-size: 16px;
             border-radius: 8px;
@@ -126,21 +125,6 @@
             transition: background-color 0.3s ease;
         }
 
-        .watermark {
-            pointer-events: none;
-            position: fixed;
-            top: -100vh;
-            left: -100vw;
-            width: 300vw;
-            height: 300vh;
-            z-index: 9999;
-            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" opacity="0.05"><text x="0" y="20" font-size="20">数据仅供参考</text></svg>');
-            display: flex;
-            transform: rotate(-30deg);
-            user-select: none;
-            transition: background-image 0.3s ease;
-        }
-
         /* 夜间模式样式 */
         .dark-mode {
             background-color: #1a1a1a !important;
@@ -216,10 +200,6 @@
 
         .dark-mode footer a {
             color: #4fc3f7 !important;
-        }
-
-        .dark-mode .watermark {
-            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" opacity="0.08"><text x="0" y="20" font-size="20" fill="white">数据仅供参考</text></svg>') !important;
         }
 
         .dark-mode select {
@@ -378,6 +358,34 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
         
+        /* 复制按钮样式 */
+        .copy-btn {
+            padding: 6px 12px;
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        
+        .copy-btn:hover {
+            background: linear-gradient(45deg, #2ecc71, #27ae60);
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        /* 操作按钮容器样式 */
+        .operation-div {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        
         /* 技能统计弹窗样式 */
         .skill-modal {
             display: none;
@@ -495,13 +503,37 @@
         }
         
         .skill-table th {
-            background: rgba(44, 62, 80, 0.7);
-            color: #e2e8f0;
+            background-color: #1976d2 !important;
+            border-bottom: 2px solid #1976d2 !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+            border-color: #555 !important;
             padding: 12px 15px;
             text-align: left;
             font-weight: 600;
         }
+
+        .skill-table td {
+            border-color: #555 !important;
+        }
+
         
+        .skill-table table {
+            background-color: #2d2d2d !important;
+        }
+
+        .skill-table .table-container {
+            border-color: #555 !important;
+            scrollbar-color: #555 #2d2d2d;
+        }
+
+        .skill-table tr {
+            background-color: #1a1a1a;
+        }
+
+        .skill-table tr:nth-child(even) {
+            background-color: #383838 !important;
+        }
+
         .skill-table td {
             padding: 12px 15px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -802,20 +834,8 @@
 </head>
 
 <body>
-    <h1>🎯 星痕共鸣实时战斗数据展示 V2.2.2</h1>
-    <div style="margin: 20px 0;">
-        <label for="sortSelect" style="margin-right: 10px; font-weight: bold;">排序方式:</label>
-        <select id="sortSelect" onchange="updateSortMode()" style="padding: 8px 12px; font-size: 14px; border-radius: 5px; border: 1px solid #ddd; background-color: white;">
-            <option value="uid">按UID排序 (升序)</option>
-            <option value="takenDamage">按承伤排序 (降序)</option>
-            <option value="damage">按总伤害排序 (降序)</option>
-            <option value="dps">按总DPS排序 (降序)</option>
-            <option value="realtimeDpsMax">按最大瞬时DPS排序 (降序)</option>
-            <option value="healing">按总治疗排序 (降序)</option>
-            <option value="hps">按总HPS排序 (降序)</option>
-            <option value="realtimeHpsMax">按最大瞬时HPS排序 (降序)</option>
-        </select>
-    </div>
+    <h1>🎯 星痕共鸣实时战斗数据展示 V2.3</h1>
+    <div style="margin: 20px 0;"></div>
     <button class="main-button" onclick="clearData()">✨ 清空统计数据</button>
     <button class="main-button" id="pauseButton" onclick="togglePause()">⏸️ 暂停统计</button>
     <button class="main-button" onclick="toggleDarkMode()">🌙 夜间模式</button>
@@ -882,6 +902,7 @@
                             <tr>
                                 <th>技能ID</th>
                                 <th>类型</th>
+                                <th>元素</th>
                                 <th>总数值</th>
                                 <th>使用次数</th>
                                 <th>暴击率</th>
@@ -913,7 +934,21 @@
         <div id="dpsChart" style="width: 100%; height: 350px;"></div>
     </div>
 
-            <div class="card">
+        <div class="card">
+            <div style="margin: 20px 0;">
+                <label for="sortSelect" style="margin-right: 10px; font-weight: bold;">排序方式:</label>
+                <select id="sortSelect" onchange="updateSortMode()" style="padding: 8px 12px; font-size: 14px; border-radius: 5px; border: 1px solid #ddd; background-color: white;">
+                    <option value="uid">按UID排序 (升序)</option>
+                    <option value="fightPoint">按评分排序 (降序)</option>
+                    <option value="takenDamage">按承伤排序 (降序)</option>
+                    <option value="damage">按总伤害排序 (降序)</option>
+                    <option value="dps">按总DPS排序 (降序)</option>
+                    <option value="realtimeDpsMax">按最大瞬时DPS排序 (降序)</option>
+                    <option value="healing">按总治疗排序 (降序)</option>
+                    <option value="hps">按总HPS排序 (降序)</option>
+                    <option value="realtimeHpsMax">按最大瞬时HPS排序 (降序)</option>
+                </select>
+            </div>
             <!-- 数据组显示控制 -->
             <div class="data-group-controls">
                 <button id="damageGroupBtn" class="data-group-button active" onclick="toggleDataGroup('damage')">
@@ -933,6 +968,7 @@
                             <th rowspan="2" title="角色唯一标识符">角色ID</th>
                             <th rowspan="2" title="角色昵称/自定义昵称">角色昵称</th>
                             <th rowspan="2" title="角色职业">职业</th>
+                            <th rowspan="2" title="角色评分">评分</th>
                             <th rowspan="2" title="角色在战斗中受到的伤害">承伤</th>
                             <th rowspan="2" title="角色在战斗中的暴击触发率">暴击率</th>
                             <th rowspan="2" title="角色在战斗中的幸运触发率">幸运率</th>
@@ -942,7 +978,7 @@
                             <th class="healing-main-col" colspan="4">治疗</th>
                             <th class="healing-simple-col" style="display: none;" colspan="1">治疗</th>
                             <th class="hps-col" colspan="3">HPS</th>
-                            <th rowspan="2">技能分析</th>
+                            <th rowspan="2">操作</th>
                         </tr>
                         <tr>
                             <th class="damage-cols" title="角色在战斗中造成的总伤害">总伤害</th>
@@ -965,8 +1001,6 @@
                 </table>
             </div>
         </div>
-
-    <div class="watermark"></div>
 
     <footer style="margin-top: 40px; font-size: 14px; color: #888;">
         <span>© 2025 Made with ❤️ by </span>
@@ -993,6 +1027,9 @@
         let isUpdatingFromLegend = false; // 防止图例事件和控制面板事件相互触发
         let currentUserArray = []; // 缓存当前用户数组用于查找用户名
         
+        // y轴动态调整相关变量 
+        const Y_AXIS_FLOOR_MIN = 10000;
+        
         // WebSocket连接相关变量
         let socket = null;
         let isWebSocketConnected = false;
@@ -1015,6 +1052,92 @@
         let skillChart1 = null;
         let skillChart2 = null;
         let currentSkillUserId = 0;
+        
+        // 从series数据中提取可见最大值
+        function getVisibleMaxFromSeries(seriesArray) {
+            let m = 0;
+            for (const series of seriesArray) {
+                const arr = series.data || [];
+                for (let i = 0; i < arr.length; i++) {
+                    const v = arr[i];
+                    if (typeof v === 'number') m = Math.max(m, v);
+                }
+            }
+            return m;
+        }
+
+        // 将数值向上取整到好读的档位
+        function niceCeil(val) {
+            if (val <= 0) return 1000;
+            const exp = Math.pow(10, Math.floor(Math.log10(val)));
+            const bases = [1, 2, 2.5, 5, 10, 20, 25, 50, 100];
+            for (const b of bases) {
+                const candidate = b * exp;
+                if (candidate >= val) return candidate;
+            }
+            return Math.ceil(val / exp) * exp;
+        }
+        
+        // 复制用户数据
+        function copyUserData(userId) {
+            const user = getUserFromArray(userId);
+            if (!user) {
+                console.error('未找到用户数据');
+                return;
+            }
+            
+            const hasValidName = user.name && user.name.trim() !== '';
+            const nickname = userNicknames[userId] || (hasValidName ? user.name : '') || '';
+            const copyText = `${nickname}#${userId} 伤害:${user.total_damage.total} 治疗:${user.total_healing.total} DPS:${user.total_dps.toFixed(2)} HPS:${user.total_hps.toFixed(2)}`;
+
+            // 复制昵称到剪贴板
+            navigator.clipboard.writeText(copyText).then(() => {
+                // 显示复制成功提示
+                showCopySuccess();
+            }).catch(err => {
+                console.error('复制失败:', err);
+                // 降级方案：使用传统方法复制
+                try {
+                    const textArea = document.createElement('textarea');
+                    textArea.value = copyText;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    showCopySuccess();
+                } catch (e) {
+                    console.error('降级复制方案也失败:', e);
+                }
+            });
+        }
+        
+        // 显示复制成功提示
+        function showCopySuccess() {
+            // 创建临时提示元素
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #4CAF50;
+                color: white;
+                padding: 10px 20px;
+                border-radius: 4px;
+                z-index: 10000;
+                font-size: 14px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                animation: slideIn 0.3s ease-out;
+            `;
+            toast.textContent = '✅ 已复制用户数据';
+            document.body.appendChild(toast);
+            
+            // 3秒后移除提示
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 3000);
+        }
         
         // 显示技能分析弹窗
         async function showSkillAnalysis(userId) {
@@ -1071,7 +1194,7 @@
             // 更新用户信息
             document.getElementById('skillUserId').textContent = skillData.uid;
             document.getElementById('skillUserName').textContent = 
-                `${skillData.name || '未知玩家' } - 技能参与统计`;
+                `${skillData.name || `UID:${skillData.uid}` } - 技能分析`;
             document.getElementById('skillUserNickname').textContent = skillData.name;
             document.getElementById('skillUserProfession').textContent = skillData.profession;
             document.getElementById('skillCount').textContent = 
@@ -1100,6 +1223,7 @@
                 row.innerHTML = `
                     <td>${name}</td>
                     <td>${skill.type}</td>
+                    <td>${skill.elementype}</td>
                     <td>${skill.totalDamage.toLocaleString()}</td>
                     <td>${skill.totalCount}</td>
                     <td class="skill-crit">${(skill.critRate * 100).toFixed(2)}%</td>
@@ -1225,7 +1349,7 @@
                 },
                 xAxis: {
                     type: 'category',
-                    data: skillIds.map(id => `技能 ${id}`),
+                    data: skillIds.map(id => `${id}`), //图表技能名
                     axisLine: { lineStyle: { color: '#7f8c8d' } },
                     axisLabel: { 
                         color: '#95a5a6',
@@ -1280,32 +1404,40 @@
         let performanceMode = false;
         let userPriorityCache = {}; // 用户优先级缓存
         
-        // 美观的20色配色方案
-        const colors = [
-            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
-            '#DDA0DD', '#FF9F43', '#54A0FF', '#5F27CD', '#00D2D3',
-            '#10AC84', '#EE5A24', '#0984E3', '#6C5CE7', '#FD79A8',
-            '#FDCB6E', '#E84393', '#A29BFE', '#00B894', '#00CEC9'
-        ];
+        // 优化的20色配色方案
+        const PALETTE_DARK_20 = [
+            "#FF6B6B","#4ECDC4","#45B7D1","#96CEB4","#FFEAA7",
+            "#DDA0DD","#FF9F43","#54A0FF","#5F27CD","#00D2D3",
+            "#10AC84","#EE5A24","#0984E3","#6C5CE7","#FD79A8",
+            "#FF7675","#74B9FF","#A29BFE","#00B894","#FDCB6E"
+        ]; // 高饱和度版本，深色背景下区分度更高
+
+        const PALETTE_LIGHT_20 = [
+            "#E74C3C","#3498DB","#2ECC71","#F39C12","#9B59B6",
+            "#1ABC9C","#E67E22","#34495E","#F1C40F","#E91E63",
+            "#8E44AD","#16A085","#27AE60","#F39800","#D35400",
+            "#C0392B","#2980B9","#17A2B8","#28A745","#6F42C1"
+        ]; // 强对比版本，浅色背景下清晰易辨
+
+        function pickPalette() {
+            return document.body.classList.contains('dark-mode') ? PALETTE_DARK_20 : PALETTE_LIGHT_20;
+        }
         
         // 为用户分配固定颜色
         function getUserColor(userId) {
+            const palette = pickPalette();
             const userIdStr = String(userId);
             
             if (!userColorMap[userIdStr]) {
                 // 基于用户ID的哈希值分配颜色，确保同一个用户总是得到相同的颜色
                 let hash = 0;
                 for (let i = 0; i < userIdStr.length; i++) {
-                    const char = userIdStr.charCodeAt(i);
-                    hash = ((hash << 5) - hash) + char;
-                    hash = hash & hash; // 转换为32位整数
+                    hash = ((hash << 5) - hash) + userIdStr.charCodeAt(i);
+                    hash |= 0;
                 }
-                
-                // 使用哈希值选择颜色
-                const colorIndex = Math.abs(hash) % colors.length;
-                userColorMap[userIdStr] = colors[colorIndex];
+                const idx = Math.abs(hash) % palette.length;
+                userColorMap[userIdStr] = palette[idx];
             }
-            
             return userColorMap[userIdStr];
         }
 
@@ -1472,9 +1604,6 @@
         // 处理数据更新（WebSocket和API通用）
         function processDataUpdate(data, updateHistory = true) {
             try {
-                const damageTable = document.getElementById('damageTable').querySelector('tbody');
-                damageTable.innerHTML = '';
-                
                 // 将数据转换为数组以便排序
                 const userArray = Object.keys(data.user).map(id => ({
                     id: Number(id),
@@ -1518,38 +1647,42 @@
             }
         }
                 
-                // 生成表格行
+        // 生成表格行
         function updateTables(visibleUserArray) {
             const damageTable = document.getElementById('damageTable').querySelector('tbody');
-            damageTable.innerHTML = '';
-                for (const user of visibleUserArray) {
-                    const crit_rate = user.total_count.critical / user.total_count.total;
-                    const lucky_rate = user.total_count.lucky / user.total_count.total;
-                    
+            //获取damageTable里的所有行
+            let existingRows = damageTable.querySelectorAll('tr');
+            if (existingRows.length > visibleUserArray.length) {
+                // 移除多余的行
+                for (let i = existingRows.length - 1; i >= visibleUserArray.length; i--) {
+                    damageTable.removeChild(existingRows[i]);
+                }
+            }
+            if (existingRows.length < visibleUserArray.length) {
+                // 添加新行
+                for (let i = existingRows.length; i < visibleUserArray.length; i++) {
                     const row = document.createElement('tr');
+                    damageTable.appendChild(row);
+                }
+            }
+            existingRows = damageTable.querySelectorAll('tr');
+            
+            for (let i = 0; i < visibleUserArray.length; i++) {
+                const user = visibleUserArray[i];
+                const crit_rate = user.total_count.critical / user.total_count.total;
+                const lucky_rate = user.total_count.lucky / user.total_count.total;
+
+                const row = existingRows[i];
+
+                const isSimpleMode = document.body.classList.contains('simple-mode');
                     
-                    // 角色ID列
-                    const uidCell = document.createElement('td');
-                uidCell.textContent = `${user.id}`;
-                    row.appendChild(uidCell);
-                    
-                    // 角色昵称列
-                    const nicknameCell = document.createElement('td');
-                    // Check if user.name is a non-empty string
-                    const hasValidName = user.name && user.name.trim() !== '';
-                    const nickname = userNicknames[user.id] || (hasValidName ? user.name : '');
-                    
-                    nicknameCell.textContent = nickname;
-                    row.appendChild(nicknameCell);
-                    
-                    const isSimpleMode = document.body.classList.contains('simple-mode');
-                    
-                    // 其他数据列
-                    const otherCells = [
-                        user.profession || '未知',
-                        user.taken_damage,
-                        `${(crit_rate * 100).toFixed(2)}%`,
-                        `${(lucky_rate * 100).toFixed(2)}%`,
+                // 其他数据列
+                const otherCells = [
+                    user.profession || '未知',
+                    user.fightPoint,
+                    user.taken_damage,
+                    `${(crit_rate * 100).toFixed(2)}%`,
+                    `${(lucky_rate * 100).toFixed(2)}%`,
                 ];
                 if (currentDataGroup === 'damage' || currentDataGroup === 'all') {
                     otherCells.push(user.total_damage.total);
@@ -1581,23 +1714,69 @@
                         user.total_hps.toFixed(2),
                     );
                 }
-                    
-                    otherCells.forEach(cellData => {
+                let existingCells = row.querySelectorAll('td');
+                //所需展示的列数
+                const requiredColumnCount = 3 + otherCells.length;
+                if (existingCells.length > requiredColumnCount) {
+                    // 移除多余的单元格
+                    for (let j = existingCells.length - 1; j >= requiredColumnCount; j--) {
+                        row.removeChild(existingCells[j]);
+                    }
+                }
+                if (existingCells.length < requiredColumnCount) {
+                    // 添加新单元格
+                    for (let j = existingCells.length; j < requiredColumnCount; j++) {
                         const cell = document.createElement('td');
-                        cell.textContent = cellData;
                         row.appendChild(cell);
-                    });
+                    }
+                }
+                existingCells = row.querySelectorAll('td');
+                // 更新单元格内容
+                existingCells.forEach((cell, index) => {
+                    if (index < 2) return;
+                    if (otherCells[index - 2] !== undefined) {
+                        cell.textContent = otherCells[index - 2];
+                    }
+                });
 
-                    const skillCell = document.createElement('td');
+                // 角色ID列
+                const uidCell = existingCells[0];
+                uidCell.textContent = `${user.id}`;
+                    
+                // 角色昵称列
+                const nicknameCell = existingCells[1];
+                // Check if user.name is a non-empty string
+                const hasValidName = user.name && user.name.trim() !== '';
+                const nickname = userNicknames[user.id] || (hasValidName ? user.name : '');
+                    
+                nicknameCell.textContent = nickname;
+                const operationCell = existingCells[existingCells.length - 1];
+                if (operationCell.querySelector('.skill-btn')) {
+                    // 如果已经存在技能按钮，则只更新用户ID
+                    operationCell.querySelector('.skill-btn').setAttribute('data-user-id', user.id);
+                    operationCell.querySelector('.copy-btn').setAttribute('data-user-id', user.id);
+                } else {
+                    operationCell.innerHTML = '';
+                    const operationDiv = document.createElement('div');
+                    operationDiv.className = 'operation-div';
+                    operationCell.appendChild(operationDiv);
+
+                    // 创建复制按钮
+                    const copyButton = document.createElement('button');
+                    copyButton.className = 'copy-btn';
+                    copyButton.innerHTML = '<i class="icon">📋</i> 复制数据';
+                    copyButton.setAttribute('data-user-id', user.id);
+                    operationDiv.appendChild(copyButton);
+
+                    // 创建技能按钮
                     const skillButton = document.createElement('button');
                     skillButton.className = 'skill-btn';
-                    skillButton.innerHTML = '<i class="icon">📊</i> 技能参与';
-                    skillButton.onclick = () => showSkillAnalysis(user.id);
-                    skillCell.appendChild(skillButton);
-                    row.appendChild(skillCell);
-                    
-                    damageTable.appendChild(row);
+                    skillButton.innerHTML = '<i class="icon">📊</i> 技能分析';
+                    skillButton.setAttribute('data-user-id', user.id);
+                    operationDiv.appendChild(skillButton);
                 }
+            }
+            updateTableStickyHeader();
         }
 
         async function fetchData() {
@@ -1647,6 +1826,9 @@
                     break;
                 case 'realtimeHpsMax':
                     userArray.sort((a, b) => b.realtime_hps_max - a.realtime_hps_max);
+                    break;
+                case 'fightPoint':
+                    userArray.sort((a, b) => b.fightPoint - a.fightPoint);
                     break;
                 default:
                     userArray.sort((a, b) => a.id - b.id);
@@ -2107,19 +2289,13 @@
             const currentOption = chart.getOption();
             const currentSeries = currentOption.series || [];
             
-            // 生成时间轴数据 (只在初次或数据长度变化时更新)
-            if (!chartInitialized || !currentOption.xAxis || !currentOption.xAxis[0] || currentOption.xAxis[0].data.length !== dataLength) {
-                const xAxisData = [];
+            // 生成时间轴数据
+            const xAxisChanged = !chartInitialized || !currentOption.xAxis || !currentOption.xAxis[0] || currentOption.xAxis[0].data.length !== dataLength;
+            let xAxisData = [];
+            if (xAxisChanged) {
                 for (let i = 0; i < dataLength; i++) {
                     xAxisData.push('');
                 }
-                
-                chart.setOption({
-                    xAxis: {
-                        data: xAxisData
-                    }
-                }, false, true); // 不合并，静默更新
-                
                 chartInitialized = true;
             }
             
@@ -2143,38 +2319,66 @@
                 // 构建数据数组
                 const data = new Array(dataLength).fill(null);
                 
-                // 填充真实数据点
+                // 填充真实数据点 - 稳定化时间映射
                 const timeStep = performanceMode ? 200 : 100;
+                
+                // 使用固定时间基准，避免滚动时索引抖动
+                const baseTime = Math.floor(currentTime / timeStep) * timeStep;
+                
                 history.forEach(point => {
-                    const timeAgo = currentTime - point.time;
+                    const timeAgo = baseTime - point.time;
                     const dataIndex = dataLength - 1 - Math.floor(timeAgo / timeStep);
                     if (dataIndex >= 0 && dataIndex < dataLength) {
-                        data[dataIndex] = point.dps;
+                        // 如果该位置已有数据，取最大值避免覆盖峰值
+                        if (data[dataIndex] === null) {
+                            data[dataIndex] = point.dps;
+                        } else {
+                            data[dataIndex] = Math.max(data[dataIndex], point.dps);
+                        }
                     }
                 });
                 
-                // 平滑处理 - 避免突兀的断线
+                // 数据稳定化处理 - 减少蠕动和跳跃
                 if (!performanceMode) {
+                    // 1. 峰值保护：避免相邻点的峰值跳跃
+                    for (let i = 1; i < data.length - 1; i++) {
+                        if (data[i] !== null && data[i-1] !== null && data[i+1] !== null) {
+                            // 如果当前点明显偏离趋势，平滑处理
+                            const avg = (data[i-1] + data[i+1]) / 2;
+                            if (Math.abs(data[i] - avg) > avg * 0.3 && data[i] < avg) {
+                                data[i] = Math.max(data[i], avg * 0.8);
+                            }
+                        }
+                    }
+                    
+                    // 2. 填充小间隔，保持连续性
                     for (let i = 1; i < data.length; i++) {
                         if (data[i] === null && data[i-1] !== null) {
-                            // 查找间隔长度
-                            let gapLength = 0;
-                            for (let j = i; j < Math.min(i + 10, data.length); j++) {
-                                if (data[j] !== null) break;
-                                gapLength++;
+                            // 短间隔用渐变填充，避免突然断线
+                            let nextIndex = -1;
+                            for (let j = i + 1; j < Math.min(i + 3, data.length); j++) {
+                                if (data[j] !== null) {
+                                    nextIndex = j;
+                                    break;
+                                }
                             }
-                            // 短间隔保持水平线，避免视觉断裂
-                            if (gapLength <= 5) {
+                            if (nextIndex !== -1 && nextIndex - i <= 2) {
+                                // 线性插值填充
+                                const step = (data[nextIndex] - data[i-1]) / (nextIndex - i + 1);
+                                data[i] = data[i-1] + step;
+                            } else {
+                                // 保持前值
                                 data[i] = data[i-1];
                             }
                         }
                     }
                 }
                 
-                // 线条样式
-                const lineWidths = [3, 2.5, 2.2, 1.8, 1.5];
-                const widthIndex = Math.floor(index / 4) % lineWidths.length;
-                const lineWidth = performanceMode ? Math.max(1.5, lineWidths[widthIndex] - 0.5) : lineWidths[widthIndex];
+                // 重要程度分层样式（Top 5突出显示）
+                const PRIMARY_COUNT = 5;
+                const isPrimary = index < PRIMARY_COUNT;
+                const lineWidth = isPrimary ? 3.0 : 1.2;
+                const opacity = isPrimary ? 1.0 : 0.45;
                 
                 // 检查是否存在同名series
                 if (existingSeriesMap[nickname]) {
@@ -2186,39 +2390,49 @@
                         lineStyle: {
                             ...existingSeries.lineStyle,
                             color: color,
-                            width: lineWidth
+                            width: lineWidth,
+                            opacity: opacity
                         },
                         itemStyle: {
-                            color: color
-                        }
+                            color: color,
+                            opacity: opacity
+                        },
+                        z: isPrimary ? 3 : 1,
+                        zlevel: isPrimary ? 0 : -1
                     });
                 } else {
-                    // 创建新series
+                    // 创建新series（分层显示）
                     updatedSeries.push({
                         name: nickname,
                         type: 'line',
                         data: data,
+                        symbol: 'none',
+                        smooth: false, // 完全关闭平滑避免形态抖动
+                        connectNulls: false,
+                        sampling: false, // 关闭采样避免峰值游移
+                        animation: false,
+                        silent: false,
                         lineStyle: {
                             color: color,
                             width: lineWidth,
-                            cap: 'round',
-                            join: 'round'
+                            opacity: opacity
                         },
-                        itemStyle: {
-                            color: color
+                        itemStyle: { 
+                            color: color, 
+                            opacity: opacity 
                         },
-                        symbol: 'none',
-                        smooth: 0.15, // 减少平滑度避免过度计算
-                        connectNulls: false,
-                        sampling: 'lttb',
-                        animation: false, // 完全禁用动画
-                        silent: false, // 保持交互性
                         emphasis: {
                             focus: 'series',
-                            lineStyle: {
-                                width: lineWidth + 0.5
+                            lineStyle: { 
+                                width: lineWidth + 0.7, 
+                                opacity: 1 
+                            },
+                            itemStyle: { 
+                                opacity: 1 
                             }
-                        }
+                        },
+                        z: isPrimary ? 3 : 1,
+                        zlevel: isPrimary ? 0 : -1
                     });
                 }
             });
@@ -2245,16 +2459,106 @@
                 legendSelected[seriesName] = !(userIdStr && visibleUsers[userIdStr] === false);
             });
             
-            // 使用ECharts内置的图例机制，统一处理显示/隐藏
+            // y轴调整算法
+            const visibleMax = getVisibleMaxFromSeries(updatedSeries);
+            
+            // 让可见最大值占约75%图高，向上取整
+            let proposedTop = visibleMax > 0 ? 
+                niceCeil(visibleMax / 0.75) : Y_AXIS_FLOOR_MIN;
+            
+            // 保底最小值
+            proposedTop = Math.max(proposedTop, Y_AXIS_FLOOR_MIN);
+            
+            // 加3%顶部余量防压顶
+            proposedTop = Math.max(proposedTop, visibleMax * 1.03);
+            
+            // 上快下慢 + 短暂滞后
+            const DOWN_FRAC = 0.85;
+            const DOWN_DWELL_MS = 1500;
+            const nowTs = Date.now();
+            window.__ymax_state = window.__ymax_state || { yMax: 10000, since: 0 };
+            
+            let { yMax: curTop, since } = window.__ymax_state;
+            
+            // 是否允许下调
+            let canDown = false;
+            if (visibleMax < curTop * DOWN_FRAC) {
+                if (!since) since = nowTs;
+                canDown = (nowTs - since) >= DOWN_DWELL_MS;
+            } else {
+                since = 0; // 只要又接近上沿，取消降轴计时
+            }
+            
+            // 只允许在 canDown==true 时把目标设得比当前低
+            if (!canDown && proposedTop < curTop) proposedTop = curTop;
+            
+            // 限制单帧最大降幅
+            const MAX_DROP = 0.15;
+            if (proposedTop < curTop * (1 - MAX_DROP)) {
+                proposedTop = curTop * (1 - MAX_DROP);
+            }
+            
+            // 平滑一步
+            const alpha = proposedTop > curTop ? 0.35 : 0.18;
+            curTop = curTop + alpha * (proposedTop - curTop);
+            
+            // 微抖收敛
+            if (Math.abs(curTop - proposedTop) < 1) curTop = proposedTop;
+            
+            // 更新状态
+            window.__ymax_state = { yMax: curTop, since };
+            
+            // 合并所有配置为一次setOption调用
             chart.setOption({
+                // 如果这次 x 轴长度改变，也一起带上
+                ...(xAxisChanged ? { 
+                    xAxis: { 
+                        data: xAxisData,
+                        axisLine: { lineStyle: { color: document.body.classList.contains('dark-mode') ? 'rgba(180,180,180,0.25)' : 'rgba(100,100,100,0.4)' } },
+                        axisTick: { lineStyle: { color: document.body.classList.contains('dark-mode') ? 'rgba(180,180,180,0.25)' : 'rgba(100,100,100,0.4)' } },
+                        axisLabel: { color: document.body.classList.contains('dark-mode') ? 'rgba(220,220,220,0.65)' : 'rgba(60,60,60,0.8)' },
+                        splitLine: { show: true, lineStyle: { color: document.body.classList.contains('dark-mode') ? 'rgba(200,200,200,0.12)' : 'rgba(150,150,150,0.3)', type: 'dashed' } }
+                    } 
+                } : {}),
                 series: updatedSeries,
                 legend: {
-                    data: updatedSeries.map(s => s.name), // 重新设置图例数据
+                    data: updatedSeries.map(s => s.name),
                     selected: legendSelected,
                     textStyle: {
-                        color: document.body.classList.contains('dark-mode') ? '#cbd5e1' : '#666'
+                        color: document.body.classList.contains('dark-mode') ? '#E6E6E6' : '#444'
                     }
-                }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: 'DPS',
+                    nameTextStyle: {
+                        color: document.body.classList.contains('dark-mode') ? 'rgba(220,220,220,0.8)' : '#333',
+                        fontSize: 12
+                    },
+                    min: 0,
+                    max: curTop,
+                    splitNumber: 6,
+                    animation: false,
+                    axisLine: { lineStyle: { color: document.body.classList.contains('dark-mode') ? 'rgba(180,180,180,0.25)' : 'rgba(100,100,100,0.4)' } },
+                    axisTick: { lineStyle: { color: document.body.classList.contains('dark-mode') ? 'rgba(180,180,180,0.25)' : 'rgba(100,100,100,0.4)' } },
+                    axisLabel: {
+                        color: document.body.classList.contains('dark-mode') ? 'rgba(220,220,220,0.65)' : 'rgba(60,60,60,0.8)',
+                        fontSize: 11,
+                        formatter: function(value) {
+                            if (value >= 1000) {
+                                return (value / 1000).toFixed(1) + 'K';
+                            }
+                            return value;
+                        }
+                    },
+                    splitLine: { lineStyle: { color: document.body.classList.contains('dark-mode') ? 'rgba(200,200,200,0.12)' : 'rgba(150,150,150,0.3)', type: 'dashed' } }
+                },
+                tooltip: {
+                    backgroundColor: document.body.classList.contains('dark-mode') ? 'rgba(32,32,40,0.92)' : 'rgba(255,255,255,0.95)',
+                    borderColor: document.body.classList.contains('dark-mode') ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.15)',
+                    textStyle: { color: document.body.classList.contains('dark-mode') ? '#EEE' : '#333' }
+                },
+                grid: { left: 56, right: '4%', bottom: '8%', top: '15%', containLabel: true }
             }, false, true);
             
             // 更新状态显示
@@ -2473,6 +2777,33 @@
             
             // 只在初始化时获取一次数据，后续通过WebSocket接收
             fetchData();
+            
+            // 添加事件委托处理技能按钮点击
+            const damageTable = document.getElementById('damageTable');
+            if (damageTable) {
+                damageTable.addEventListener('click', function(event) {
+                    // 处理技能按钮点击
+                    if (event.target.classList.contains('skill-btn') || 
+                        event.target.closest('.skill-btn')) {
+                        const button = event.target.classList.contains('skill-btn') ? 
+                            event.target : event.target.closest('.skill-btn');
+                        const userId = button.getAttribute('data-user-id');
+                        if (userId) {
+                            showSkillAnalysis(parseInt(userId));
+                        }
+                    }
+                    // 处理复制按钮点击
+                    else if (event.target.classList.contains('copy-btn') || 
+                        event.target.closest('.copy-btn')) {
+                        const button = event.target.classList.contains('copy-btn') ? 
+                            event.target : event.target.closest('.copy-btn');
+                        const userId = button.getAttribute('data-user-id');
+                        if (userId) {
+                            copyUserData(parseInt(userId));
+                        }
+                    }
+                });
+            }
         }
         
         // 等待DOM加载完成后初始化
@@ -2483,14 +2814,16 @@
         }
     </script>
     <script>
-        window.onload = function(){
-        const damageTable = document.getElementById('damageTable');
-        const damageTableRows = damageTable.querySelectorAll('tr');
-        damageTableRows.forEach((row, index) => {
-                const height = row.offsetHeight;
-                row.style.setProperty('--th-top', `${index * height}px`);
+        function updateTableStickyHeader(){
+            const damageTable = document.getElementById('damageTable');
+            const damageTableRows = damageTable.querySelectorAll('tr');
+            damageTableRows.forEach((row) => {
+                const top = row.offsetTop
+                row.style.setProperty('--th-top', `${top}px`);
             });
         }
+        window.addEventListener('resize', updateTableStickyHeader);
+        document.addEventListener('DOMContentLoaded', updateTableStickyHeader);
     </script>
 </body>
 

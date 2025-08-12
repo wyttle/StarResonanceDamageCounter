@@ -2,13 +2,13 @@ const cap = require('cap');
 const cors = require('cors');
 const readline = require('readline');
 const winston = require("winston");
-const net = require('net');
+const zlib = require('zlib');
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 const fs = require('fs');
 const PacketProcessor = require('./algo/packet');
-const pb = require('./algo/pb');
 const { log } = require('console');
 const Readable = require("stream").Readable;
 const Cap = cap.Cap;
@@ -16,6 +16,7 @@ const decoders = cap.decoders;
 const PROTOCOL = decoders.PROTOCOL;
 const print = console.log;
 const app = express();
+const { exec } = require('child_process');
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -23,12 +24,65 @@ const rl = readline.createInterface({
 });
 const devices = cap.deviceList();
 
+const elementMap = {
+        fire: '🔥火',
+        ice: '❄️冰',
+        thunder: '⚡雷',
+        earth: '🍀森',
+        wind: '💨风',
+        light: '✨光',
+        dark: '🌙暗',
+        physics: '⚔️'
+};
+
 function ask(question) {
     return new Promise(resolve => {
         rl.question(question, answer => {
             resolve(answer);
         });
     });
+}
+
+function getSubProfessionBySkillId(skillId) {
+    switch (skillId) {
+        case 1241:
+            return '射线';
+        case 55302:
+            return '协奏';
+        case 20301:
+        case 21418:
+            return '愈合';
+        case 1518:
+        case 1541:
+            return '惩戒';
+        case 2306:
+            return '狂音';
+        case 120902:
+            return '冰矛';
+        case 1714:
+        case 1734:
+            return '居合';
+        case 44701:
+            return '月刃';
+        case 220112:
+        case 2203622:
+            return '鹰弓';
+        case 1700827:
+            return '狼弓';
+        case 1419:
+            return '空枪';
+        case 1405:
+        case 1418:
+            return '重装';
+        case 2405:
+            return '防盾';
+        case 2406:
+            return '光盾';
+        case 199902:
+            return '岩盾';
+        default:
+            return '';
+    }
 }
 
 class Lock {
@@ -56,7 +110,9 @@ class Lock {
 
 // 通用统计类，用于处理伤害或治疗数据
 class StatisticData {
-    constructor() {
+    constructor(user, type) {
+        this.user = user;
+        this.type = type || '';
         this.stats = {
             normal: 0,
             critical: 0,
@@ -187,12 +243,13 @@ class UserData {
     constructor(uid) {
         this.uid = uid;
         this.name = '';
-        this.damageStats = new StatisticData();
-        this.healingStats = new StatisticData();
+        this.damageStats = new StatisticData(this, '伤害');
+        this.healingStats = new StatisticData(this, '治疗');
         this.takenDamage = 0; // 承伤
         this.profession = '未知';
         this.skillUsage = new Map(); // 技能使用情况
         this.fightPoint = 0; // 总评分
+        this.subProfession = '';
     }
 
     /** 添加伤害记录
@@ -206,19 +263,36 @@ class UserData {
         this.damageStats.addRecord(damage, isCrit, isLucky, hpLessenValue);
         // 记录技能使用情况
         if (!this.skillUsage.has(skillId)) {
-            this.skillUsage.set(skillId, new StatisticData());
+            this.skillUsage.set(skillId, new StatisticData(this, '伤害'));
         }
         this.skillUsage.get(skillId).addRecord(damage, isCrit, isLucky, hpLessenValue);
         this.skillUsage.get(skillId).realtimeWindow.length = 0;
+
+        const subProfession = getSubProfessionBySkillId(skillId);
+        if (subProfession) {
+            this.setSubProfession(subProfession);
+        }
     }
 
     /** 添加治疗记录
+     * @param {number} skillId - 技能ID/Buff ID
      * @param {number} healing - 治疗值
      * @param {boolean} isCrit - 是否为暴击
      * @param {boolean} [isLucky] - 是否为幸运
      */
-    addHealing(healing, isCrit, isLucky) {
+    addHealing(skillId, healing, isCrit, isLucky) {
         this.healingStats.addRecord(healing, isCrit, isLucky);
+        // 记录技能使用情况
+        if (!this.skillUsage.has(skillId)) {
+            this.skillUsage.set(skillId, new StatisticData(this, '治疗'));
+        }
+        this.skillUsage.get(skillId).addRecord(healing, isCrit, isLucky);
+        this.skillUsage.get(skillId).realtimeWindow.length = 0;
+
+        const subProfession = getSubProfessionBySkillId(skillId);
+        if (subProfession) {
+            this.setSubProfession(subProfession);
+        }
     }
 
     /** 添加承伤记录
@@ -226,13 +300,6 @@ class UserData {
      * */
     addTakenDamage(damage) {
         this.takenDamage += damage;
-    }
-
-    /** 设置职业
-     * @param {string} profession - 职业名称
-     * */
-    setProfession(profession) {
-        this.profession = profession;
     }
 
     /** 更新实时DPS和HPS 计算过去1秒内的总伤害和治疗 */
@@ -274,7 +341,7 @@ class UserData {
             total_hps: this.getTotalHps(),
             total_healing: { ...this.healingStats.stats },
             taken_damage: this.takenDamage,
-            profession: this.profession,
+            profession: this.profession + (this.subProfession ? `-${this.subProfession}` : ''),
             name: this.name,
             fightPoint: this.fightPoint,
         };
@@ -293,25 +360,12 @@ class UserData {
             const skillConfig = require('./skill_config.json').skills;
             const cfg = skillConfig[skillId];
             const name = cfg ? cfg.name : skillId;
-
-            let type = '未知';
-            if (cfg) {
-                switch (cfg.type) {
-                    case 'damage':
-                        type = '伤害';
-                        break;
-                    case 'healing':
-                        type = '治疗';
-                        break;
-                    default:
-                        type = '未知';
-                        break;
-                }
-            }
+            const elementype = elementMap[cfg?.element] ?? "";
 
             skills[skillId] = {
                 displayName: name,
-                type: type,
+                type: stat.type,
+                elementype: elementype,
                 totalDamage: stat.stats.total,
                 totalCount: stat.count.total,
                 critCount: stat.count.critical,
@@ -323,6 +377,21 @@ class UserData {
             };
         }
         return skills;
+    }
+
+    /** 设置职业
+     * @param {string} profession - 职业名称
+     * */
+    setProfession(profession) {
+        if (profession !== this.profession) this.setSubProfession('');
+        this.profession = profession;
+    }
+
+    /** 设置子职业
+     * @param {string} subProfession - 子职业名称
+     * */
+    setSubProfession(subProfession) {
+        this.subProfession = subProfession;
     }
 
     /** 设置姓名
@@ -344,7 +413,6 @@ class UserData {
         this.damageStats.reset();
         this.healingStats.reset();
         this.takenDamage = 0;
-        this.profession = '未知';
         this.skillUsage.clear();
         this.fightPoint = 0;
     }
@@ -352,12 +420,13 @@ class UserData {
 
 // 用户数据管理器
 class UserDataManager {
-    constructor() {
+    constructor(logger) {
+        this.logger = logger
         this.users = new Map();
         this.userCache = new Map(); // 用户名字和职业缓存
         this.cacheFilePath = './users.json';
         this.loadUserCache();
-        
+
         // 节流相关配置
         this.saveThrottleDelay = 2000; // 2秒节流延迟，避免频繁磁盘写入
         this.saveThrottleTimer = null;
@@ -371,10 +440,10 @@ class UserDataManager {
                 const data = fs.readFileSync(this.cacheFilePath, 'utf8');
                 const cacheData = JSON.parse(data);
                 this.userCache = new Map(Object.entries(cacheData));
-                console.log(`Loaded ${this.userCache.size} user cache entries`);
+                this.logger.info(`Loaded ${this.userCache.size} user cache entries`);
             }
         } catch (error) {
-            console.error('Failed to load user cache:', error);
+            this.logger.error('Failed to load user cache:', error);
         }
     }
 
@@ -384,7 +453,7 @@ class UserDataManager {
             const cacheData = Object.fromEntries(this.userCache);
             fs.writeFileSync(this.cacheFilePath, JSON.stringify(cacheData, null, 2), 'utf8');
         } catch (error) {
-            console.error('Failed to save user cache:', error);
+            this.logger.error('Failed to save user cache:', error);
         }
     }
 
@@ -434,6 +503,9 @@ class UserDataManager {
                 if (cachedData.profession) {
                     user.setProfession(cachedData.profession);
                 }
+                if (cachedData.fightPoint !== undefined && cachedData.fightPoint !== null) {
+                    user.setFightPoint(cachedData.fightPoint);
+                }
             }
 
             this.users.set(uid, user);
@@ -456,13 +528,14 @@ class UserDataManager {
 
     /** 添加治疗记录
      * @param {number} uid - 进行治疗的用户ID
+     * @param {number} skillId - 技能ID/Buff ID
      * @param {number} healing - 治疗值
      * @param {boolean} isCrit - 是否为暴击
      * @param {boolean} [isLucky] - 是否为幸运
      */
-    addHealing(uid, healing, isCrit, isLucky) {
+    addHealing(uid, skillId, healing, isCrit, isLucky) {
         const user = this.getUser(uid);
-        user.addHealing(healing, isCrit, isLucky);
+        user.addHealing(skillId, healing, isCrit, isLucky);
     }
 
     /** 添加承伤记录
@@ -480,15 +553,18 @@ class UserDataManager {
      * */
     setProfession(uid, profession) {
         const user = this.getUser(uid);
-        user.setProfession(profession);
+        if (user.profession !== profession) {
+            user.setProfession(profession);
+            this.logger.info(`Found profession ${profession} for uid ${uid}`);
 
-        // 更新缓存
-        const uidStr = String(uid);
-        if (!this.userCache.has(uidStr)) {
-            this.userCache.set(uidStr, {});
+            // 更新缓存
+            const uidStr = String(uid);
+            if (!this.userCache.has(uidStr)) {
+                this.userCache.set(uidStr, {});
+            }
+            this.userCache.get(uidStr).profession = profession;
+            this.saveUserCacheThrottled();
         }
-        this.userCache.get(uidStr).profession = profession;
-        this.saveUserCacheThrottled();
     }
 
     /** 设置用户姓名
@@ -497,24 +573,38 @@ class UserDataManager {
      * */
     setName(uid, name) {
         const user = this.getUser(uid);
-        user.setName(name);
+        if (user.name !== name) {
+            user.setName(name);
+            this.logger.info(`Found player name ${name} for uid ${uid}`);
 
-        // 更新缓存
-        const uidStr = String(uid);
-        if (!this.userCache.has(uidStr)) {
-            this.userCache.set(uidStr, {});
+            // 更新缓存
+            const uidStr = String(uid);
+            if (!this.userCache.has(uidStr)) {
+                this.userCache.set(uidStr, {});
+            }
+            this.userCache.get(uidStr).name = name;
+            this.saveUserCacheThrottled();
         }
-        this.userCache.get(uidStr).name = name;
-        this.saveUserCacheThrottled();
     }
 
     /** 设置用户总评分
      * @param {number} uid - 用户ID
      * @param {number} fightPoint - 总评分
-     */
+    */
     setFightPoint(uid, fightPoint) {
         const user = this.getUser(uid);
-        user.setFightPoint(fightPoint);
+        if (user.fightPoint != fightPoint) {
+            user.setFightPoint(fightPoint);
+            this.logger.info(`Found fight point ${fightPoint} for uid ${uid}`);
+
+            // 更新缓存
+            const uidStr = String(uid);
+            if (!this.userCache.has(uidStr)) {
+                this.userCache.set(uidStr, {});
+            }
+            this.userCache.get(uidStr).fightPoint = fightPoint;
+            this.saveUserCacheThrottled();
+        }
     }
 
     /** 更新所有用户的实时DPS和HPS */
@@ -642,7 +732,7 @@ async function getStarExeDeviceName(devices) {
 
 async function main() {
     print('Welcome to use Damage Counter for Star Resonance!');
-    print('Version: V2.2.2');
+    print('Version: V2.3');
     print('GitHub: https://github.com/dmlgzs/StarResonanceDamageCounter');
     // 从命令行参数获取设备号和日志级别
     const args = process.argv.slice(2);
@@ -698,6 +788,21 @@ async function main() {
         ]
     });
 
+    const userDataManager = new UserDataManager(logger);
+
+    // 进程退出时保存用户缓存
+    process.on('SIGINT', () => {
+        console.log('\nSaving user cache...');
+        userDataManager.forceUserCacheSave();
+        process.exit(0);
+    });
+
+    process.on('SIGTERM', () => {
+        console.log('\nSaving user cache...');
+        userDataManager.forceUserCacheSave();
+        process.exit(0);
+    });
+
     //瞬时DPS更新
     setInterval(() => {
         if (!isPaused) {
@@ -708,7 +813,7 @@ async function main() {
     //express 和 socket.io 设置
     app.use(cors());
     app.use(express.json()); // 解析JSON请求体
-    app.use(express.static('public'));
+    app.use(express.static(path.join(__dirname, 'public'))); // 静态文件服务
     const server = http.createServer(app);
     const io = new Server(server, {
         cors: {
@@ -794,8 +899,30 @@ async function main() {
     }, 50);
 
     server.listen(8989, () => {
-        logger.info('Web Server started at http://localhost:8989');
+        // 自动用默认浏览器打开网页（跨平台兼容）
+        const url = 'http://localhost:8989';
+        logger.info(`Web Server started at ${url}`);
         logger.info('WebSocket Server started');
+
+        
+        let command;
+        switch (process.platform) {
+            case 'darwin': // macOS
+                command = `open ${url}`;
+                break;
+            case 'win32': // Windows
+                command = `start ${url}`;
+                break;
+            default: // Linux 和其他 Unix-like 系统
+                command = `xdg-open ${url}`;
+                break;
+        }
+
+        exec(command, (error) => {
+            if (error) {
+                logger.error(`Failed to open browser: ${error.message}`);
+            }
+        });
     });
 
     logger.info('Welcome!');
@@ -859,7 +986,7 @@ async function main() {
                 const fragmentOffset = ip.info.fragoffset * 8;
                 const payloadLength = ip.info.totallen - ip.hdrlen;
                 const payload = Buffer.from(buffer.subarray(ip.offset, ip.offset + payloadLength));
-                
+
                 fragmentData.push({
                     offset: fragmentOffset,
                     payload: payload
@@ -884,18 +1011,24 @@ async function main() {
     };
 
     //抓包相关
+    const eth_queue = [];
     const c = new Cap();
     const device = devices[num].name;
     const filter = 'ip and tcp';
     const bufSize = 10 * 1024 * 1024;
     const buffer = Buffer.alloc(65535);
     const linkType = c.open(device, filter, bufSize, buffer);
+    if (linkType !== "ETHERNET") {
+        logger.error('WRONG DEVICE!');
+        process.exit(1);
+    }
     c.setMinBytes && c.setMinBytes(0);
     c.on("packet", async function (nbytes, trunc) {
+        eth_queue.push(Buffer.from(buffer));
+    });
+    const processEthPacket = async (frameBuffer) => {
         // logger.debug('packet: length ' + nbytes + ' bytes, truncated? ' + (trunc ? 'yes' : 'no'));
-        if (linkType !== "ETHERNET") return;
 
-        const frameBuffer = Buffer.from(buffer);
         var ethPacket = decoders.Ethernet(frameBuffer);
 
         if (ethPacket.info.type !== PROTOCOL.ETHERNET.IPV4) return;
@@ -1004,7 +1137,17 @@ async function main() {
             }
         }
         tcp_lock.release();
-    });
+    }
+    (async () => {
+        while (true) {
+            if (eth_queue.length) {
+                const pkt = eth_queue.shift();
+                processEthPacket(pkt);
+            } else {
+                await new Promise(r => setTimeout(r, 1));
+            }
+        }
+    })();
 
     //定时清理过期的IP分片缓存
     setInterval(async () => {
@@ -1026,6 +1169,13 @@ async function main() {
             clearTcpCache();
         }
     }, 10000);
+}
+
+if (!zlib.zstdDecompressSync) {
+    // 之前总是有人用旧版本nodejs，不看警告还说数据不准，现在干脆不让旧版用算了
+    // 还有人对着开源代码写闭源，不遵守许可就算了，还要诋毁开源，什么人啊这是
+    print("zstdDecompressSync is not available! Please update your Node.js!");
+    process.exit(1);
 }
 
 main();
